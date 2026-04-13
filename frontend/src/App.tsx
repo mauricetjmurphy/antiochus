@@ -131,6 +131,7 @@ export default function App() {
       const pollResult = await api.startPolling(passphrase)
       if (!pollResult.error) {
         setPolling(true)
+        await loadFriends()
       }
     }
   }

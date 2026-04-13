@@ -122,6 +122,7 @@ export async function setConfig(token: string): Promise<{ ok: boolean; bot_usern
 
 export async function getFriends(): Promise<Friend[]> {
   const res = await fetch(`${BASE}/api/friends`)
+  if (!res.ok) throw new Error('Failed to load friends')
   return res.json()
 }
 
@@ -158,6 +159,7 @@ export async function sendFile(to: string, file: File): Promise<{ ok?: boolean; 
 
 export async function getMessages(friend: string): Promise<Message[]> {
   const res = await fetch(`${BASE}/api/messages/${friend}`)
+  if (!res.ok) throw new Error('Failed to load messages')
   return res.json()
 }
 

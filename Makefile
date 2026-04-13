@@ -32,6 +32,9 @@ build-darwin-amd64: frontend
 build-darwin-arm64: frontend
 	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o dist/$(BINARY)-darwin-arm64 .
 
+build-windows-386: frontend
+	CGO_ENABLED=0 GOOS=windows GOARCH=386 go build -ldflags "$(LDFLAGS)" -o dist/$(BINARY)-windows-x86.exe .
+
 build-windows-amd64: frontend
 	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o dist/$(BINARY)-windows-amd64.exe .
 

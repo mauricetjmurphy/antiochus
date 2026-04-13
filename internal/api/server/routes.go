@@ -16,21 +16,19 @@ func (s *Server) setupRoutes() {
 
 	// ── Public (no session required) ─────────────────────
 	s.router.Get("/api/config", h.GetConfig)
+	s.router.Put("/api/config", h.PutConfig)
 	s.router.Get("/api/session/key", h.GetSessionKey)
 	s.router.Post("/api/poll/start", h.StartPoll)
 	s.router.Get("/guide", s.handleGuide)
 
+	// Friends — public so they can be managed during initial setup
+	s.router.Get("/api/friends", h.GetFriends)
+	s.router.Post("/api/friends", h.PostFriend)
+	s.router.Delete("/api/friends/{name}", h.DeleteFriend)
+
 	// ── Authenticated (session required) ─────────────────
 	s.router.Group(func(r chi.Router) {
 		r.Use(requireSession)
-
-		// Config
-		r.Put("/api/config", h.PutConfig)
-
-		// Friends
-		r.Get("/api/friends", h.GetFriends)
-		r.Post("/api/friends", h.PostFriend)
-		r.Delete("/api/friends/{name}", h.DeleteFriend)
 
 		// Messages
 		r.Post("/api/messages/send", h.SendMessage)
