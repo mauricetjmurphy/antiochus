@@ -36,8 +36,9 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.Cfg.Telegram.BotToken == "" {
-		WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "bot token not configured"})
+	sendToken, err := h.Cfg.ResolveSendBotToken(req.To)
+	if err != nil || sendToken == "" {
+		WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "no bot token available to send to this friend"})
 		return
 	}
 
@@ -48,11 +49,11 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := telegram.NewClient(h.Cfg.Telegram.BotToken)
+	client := telegram.NewClient(sendToken)
 
 	encoded := base64.StdEncoding.EncodeToString(packet)
 	if len(encoded) <= h.Cfg.Telegram.MessageCharLimit {
-		msgText := fmt.Sprintf("\U0001f510 CipherGram\n```\n%s\n```", encoded)
+		msgText := fmt.Sprintf("\U0001f510 Antiochus\n```\n%s\n```", encoded)
 		msgID, err := client.SendMessage(chatID, msgText)
 		if err != nil {
 			WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "send: " + err.Error()})
@@ -69,7 +70,7 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 
 		WriteJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "message_id": msgID})
 	} else {
-		err := client.SendDocument(chatID, packet, "ciphergram.enc", "\U0001f510 CipherGram")
+		err := client.SendDocument(chatID, packet, "antiochus.enc", "\U0001f510 Antiochus")
 		if err != nil {
 			WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "send: " + err.Error()})
 			return
@@ -106,6 +107,12 @@ func (h *Handler) SendFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	sendToken, err := h.Cfg.ResolveSendBotToken(to)
+	if err != nil || sendToken == "" {
+		WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "no bot token available to send to this friend"})
+		return
+	}
+
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "file required"})
@@ -135,9 +142,9 @@ func (h *Handler) SendFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := telegram.NewClient(h.Cfg.Telegram.BotToken)
-	caption := fmt.Sprintf("\U0001f510 CipherGram [\U0001f4ce %s]", filename)
-	if err := client.SendDocument(chatID, packet, "ciphergram.enc", caption); err != nil {
+	client := telegram.NewClient(sendToken)
+	caption := fmt.Sprintf("\U0001f510 Antiochus [\U0001f4ce %s]", filename)
+	if err := client.SendDocument(chatID, packet, "antiochus.enc", caption); err != nil {
 		WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "send: " + err.Error()})
 		return
 	}

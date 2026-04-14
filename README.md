@@ -78,7 +78,7 @@ No dependencies to install — it's a single file. They run it, open the browser
 
 ## Configuration
 
-Config file: `~/.ciphergram/ciphergram.yml` (also checks `internal/config/prod.yml` in the working directory first)
+Config file: `~/.antiochus/antiochus.yml` (also checks `internal/config/prod.yml` in the working directory first)
 
 ```yaml
 server:
@@ -122,7 +122,7 @@ The bot token and friends can also be configured from the web UI (Settings gear 
 - **File transfer** — send encrypted files up to 45 MB via Telegram documents
 - **Friends list** — manage contacts by name, add/remove from the UI or config
 - **Who Am I** — auto-discovers your Telegram chat ID in Settings
-- **Backward compatible** — decrypts both CGRAM1 (v1) and CGRAM2 (v2) wire formats
+- **Wire format v2** — ANTIO2 packets with type byte + metadata header (filename for files)
 - **Cross-platform** — single binary for Linux, macOS, and Windows (amd64 + arm64)
 - **Setup guide** — built-in guide served at `/guide`, linked from the login screen
 
@@ -175,7 +175,7 @@ The Vite dev server at http://localhost:5173 proxies API calls to the Go backend
 make test
 ```
 
-Runs crypto round-trip tests including cascade encrypt/decrypt, wrong passphrase rejection, file packet handling, and CGRAM1 backward compatibility.
+Runs crypto round-trip tests including cascade encrypt/decrypt, wrong passphrase rejection, and file packet handling.
 
 ## Project Structure
 
@@ -204,15 +204,15 @@ antiochus/
 
 ## Wire Format
 
-### CGRAM2 (current)
+### ANTIO2 (current)
 ```
-MAGIC "CGRAM2" (6B) | type (1B) | meta_len (2B) | meta (JSON)
+MAGIC "ANTIO2" (6B) | type (1B) | meta_len (2B) | meta (JSON)
 | salt (32B) | aes_nonce (12B) | chacha_nonce (12B) | ciphertext
 ```
 
 Type `0x01` = text, `0x02` = file. Meta contains `{"filename":"..."}` for files.
 
-### CGRAM1 (legacy, read-only)
+### ANTIO1 (legacy, read-only)
 ```
-MAGIC "CGRAM1" (6B) | salt (32B) | aes_nonce (12B) | chacha_nonce (12B) | ciphertext
+MAGIC "ANTIO1" (6B) | salt (32B) | aes_nonce (12B) | chacha_nonce (12B) | ciphertext
 ```

@@ -23,7 +23,7 @@ func (h *Handler) Decrypt(w http.ResponseWriter, r *http.Request) {
 	}
 
 	clean := strings.ReplaceAll(req.Ciphertext, "```", "")
-	clean = strings.ReplaceAll(clean, "\U0001f510 CipherGram", "")
+	clean = strings.ReplaceAll(clean, "\U0001f510 Antiochus", "")
 	clean = strings.TrimSpace(clean)
 	clean = strings.Join(strings.Fields(clean), "")
 

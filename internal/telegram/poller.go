@@ -162,14 +162,14 @@ func (p *Poller) processMessage(msg *TgMessage) {
 		return
 	}
 
-	// Check for text messages with CipherGram payload
+	// Check for text messages with Antiochus payload
 	text := msg.Text
-	if !strings.Contains(text, "CGRAM") && !strings.Contains(text, "\U0001f510") {
+	if !strings.Contains(text, "ANTIO") && !strings.Contains(text, "\U0001f510") {
 		return
 	}
 
 	clean := strings.ReplaceAll(text, "```", "")
-	clean = strings.ReplaceAll(clean, "\U0001f510 CipherGram", "")
+	clean = strings.ReplaceAll(clean, "\U0001f510 Antiochus", "")
 	clean = strings.TrimSpace(clean)
 	clean = strings.Join(strings.Fields(clean), "")
 

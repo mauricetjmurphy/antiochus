@@ -88,7 +88,7 @@ You and your friend need to share three things **securely** (in person, phone ca
 
 ### Alternative: Edit the config file directly
 
-Both of you can also edit `~/.ciphergram/ciphergram.yml` (or `internal/config/prod.yml`):
+Both of you can also edit `~/.antiochus/antiochus.yml` (or `internal/config/prod.yml`):
 
 ```yaml
 telegram:
@@ -107,14 +107,14 @@ friends:
 
 ### Sending files
 
-Click the paperclip icon next to the message input to send an encrypted file (up to 45 MB). The file arrives in Telegram as `ciphergram.enc` — unreadable without the passphrase. Your friend's app decrypts it and saves it to `~/.ciphergram/received/`.
+Click the paperclip icon next to the message input to send an encrypted file (up to 45 MB). The file arrives in Telegram as `antiochus.enc` — unreadable without the passphrase. Your friend's app decrypts it and saves it to `~/.antiochus/received/`.
 
 ## What Each Party Sees
 
 | Where | What you see |
 |-------|-------------|
 | Your browser | Plaintext messages and files |
-| Telegram chat | `🔐 CipherGram` + encrypted gibberish, or `ciphergram.enc` files |
+| Telegram chat | `🔐 Antiochus` + encrypted gibberish, or `antiochus.enc` files |
 | Your friend's browser | Plaintext messages and files |
 | Anyone else looking at Telegram | Encrypted gibberish only |
 
@@ -133,4 +133,4 @@ Click the paperclip icon next to the message input to send an encrypted file (up
 → Check that the chat ID in your friends list matches their actual Telegram chat ID. They can verify theirs in Settings → Who Am I.
 
 **File too large**
-→ Max file size is 45 MB (Telegram's limit is 50 MB, we leave margin for encryption overhead). This is configurable in `ciphergram.yml` under `telegram.max_file_size_mb`.
+→ Max file size is 45 MB (Telegram's limit is 50 MB, we leave margin for encryption overhead). This is configurable in `antiochus.yml` under `telegram.max_file_size_mb`.

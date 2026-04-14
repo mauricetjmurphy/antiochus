@@ -163,8 +163,8 @@ func (s *Server) bridgeMessages() {
 	for msg := range s.poller.Messages() {
 		friendName := ""
 		chatIDStr := fmt.Sprintf("%d", msg.ChatID)
-		for name, chatID := range s.cfg.Friends {
-			if chatID == chatIDStr {
+		for name, f := range s.cfg.Friends {
+			if f.ChatID == chatIDStr {
 				friendName = name
 				break
 			}

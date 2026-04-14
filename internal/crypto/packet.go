@@ -7,8 +7,8 @@ import (
 )
 
 var (
-	MagicV1 = []byte("CGRAM1")
-	MagicV2 = []byte("CGRAM2")
+	MagicV1 = []byte("ANTIO1")
+	MagicV2 = []byte("ANTIO2")
 )
 
 const (
@@ -52,9 +52,9 @@ func ParsePacket(packet []byte, passphrase string) (byte, map[string]string, []b
 	magic := string(packet[:6])
 
 	switch magic {
-	case "CGRAM2":
+	case "ANTIO2":
 		return parseV2(packet, passphrase)
-	case "CGRAM1":
+	case "ANTIO1":
 		return parseV1(packet, passphrase)
 	default:
 		return 0, nil, nil, fmt.Errorf("invalid packet: bad magic bytes %q", magic)

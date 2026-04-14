@@ -22,8 +22,9 @@ type DecryptRequest struct {
 }
 
 type FriendRequest struct {
-	Name   string `json:"name"`
-	ChatID string `json:"chat_id"`
+	Name         string `json:"name"`
+	ChatID       string `json:"chat_id"`
+	SendBotToken string `json:"send_bot_token"`
 }
 
 type ConfigUpdateRequest struct {

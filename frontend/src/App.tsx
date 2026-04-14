@@ -109,8 +109,9 @@ export default function App() {
     }
   }
 
-  const handleAddFriend = async (name: string, chatId: string) => {
-    await api.addFriend(name, chatId)
+  const handleAddFriend = async (name: string, chatId: string, sendBotToken: string) => {
+    const result = await api.addFriend(name, chatId, sendBotToken)
+    if (result.error) throw new Error(result.error)
     await loadFriends()
   }
 

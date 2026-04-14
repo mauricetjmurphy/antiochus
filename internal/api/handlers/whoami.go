@@ -42,11 +42,11 @@ func (h *Handler) WhoAmI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// From friends list
-	for name, chatID := range h.Cfg.Friends {
-		if !seen[chatID] {
-			seen[chatID] = true
+	for name, f := range h.Cfg.Friends {
+		if !seen[f.ChatID] {
+			seen[f.ChatID] = true
 			chats = append(chats, chatInfo{
-				ChatID: chatID, Username: name, Source: "friend",
+				ChatID: f.ChatID, Username: name, Source: "friend",
 			})
 		}
 	}

@@ -16,7 +16,7 @@ type ServerConfig struct {
 }
 
 type TelegramConfig struct {
-	BotToken         string `yaml:"bot_token"`
+	BotToken         string `yaml:"bot_token"` // YOUR bot — you poll this for incoming messages
 	ChatID           string `yaml:"chat_id"`
 	PollTimeout      int    `yaml:"poll_timeout"`
 	MaxFileSizeMB    int    `yaml:"max_file_size_mb"`
@@ -33,12 +33,20 @@ type StorageConfig struct {
 	MaxMessagesPerFriend int `yaml:"max_messages_per_friend"`
 }
 
+// Friend represents a contact. ChatID is the friend's chat ID with their bot.
+// SendBotToken is the friend's bot token, which YOU use to send messages to them.
+type Friend struct {
+	ChatID       string `yaml:"chat_id"`
+	SendBotToken string `yaml:"send_bot_token"`
+	Added        string `yaml:"added,omitempty"`
+}
+
 type Config struct {
 	Server   ServerConfig      `yaml:"server"`
 	Telegram TelegramConfig    `yaml:"telegram"`
 	Crypto   CryptoConfig      `yaml:"crypto"`
 	Storage  StorageConfig     `yaml:"storage"`
-	Friends  map[string]string `yaml:"friends"`
+	Friends  map[string]Friend `yaml:"friends"`
 	path     string
 }
 
@@ -62,18 +70,16 @@ func defaults() *Config {
 		Storage: StorageConfig{
 			MaxMessagesPerFriend: 500,
 		},
-		Friends: make(map[string]string),
+		Friends: make(map[string]Friend),
 	}
 }
 
 // ── Computed accessors ─────────────────────────────────────────
 
-// Argon2MemoryKB returns the Argon2 memory cost in KB (what the crypto package expects).
 func (c *Config) Argon2MemoryKB() uint32 {
 	return uint32(c.Crypto.Argon2MemoryMB) * 1024
 }
 
-// MaxFileSize returns the max file size in bytes.
 func (c *Config) MaxFileSize() int64 {
 	return int64(c.Telegram.MaxFileSizeMB) * 1024 * 1024
 }
@@ -82,14 +88,13 @@ func (c *Config) MaxFileSize() int64 {
 
 func configDir() string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".ciphergram")
+	return filepath.Join(home, ".antiochus")
 }
 
 func configPath() string {
-	// Look for prod.yml next to the binary first, then fall back to ~/.ciphergram
 	candidates := []string{
 		"internal/config/prod.yml",
-		filepath.Join(configDir(), "ciphergram.yml"),
+		filepath.Join(configDir(), "antiochus.yml"),
 	}
 	for _, p := range candidates {
 		if _, err := os.Stat(p); err == nil {
@@ -122,7 +127,7 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
 	if cfg.Friends == nil {
-		cfg.Friends = make(map[string]string)
+		cfg.Friends = make(map[string]Friend)
 	}
 	return cfg, nil
 }
@@ -150,8 +155,12 @@ func (c *Config) SetToken(token string) {
 	c.Telegram.BotToken = token
 }
 
-func (c *Config) AddFriend(name, chatID string) {
-	c.Friends[name] = chatID
+func (c *Config) AddFriend(name, chatID, sendBotToken string) {
+	c.Friends[name] = Friend{
+		ChatID:       chatID,
+		SendBotToken: sendBotToken,
+		Added:        time.Now().Format("2006-01-02"),
+	}
 }
 
 func (c *Config) RemoveFriend(name string) bool {
@@ -163,20 +172,37 @@ func (c *Config) RemoveFriend(name string) bool {
 }
 
 func (c *Config) ResolveChatID(friendName string) (string, error) {
-	if chatID, ok := c.Friends[friendName]; ok {
-		return chatID, nil
+	if f, ok := c.Friends[friendName]; ok {
+		return f.ChatID, nil
 	}
 	return "", fmt.Errorf("friend %q not found", friendName)
 }
 
-// FriendsWithMeta returns friends in the format the API handlers expect.
+// ResolveSendBotToken returns the bot token used to send messages to this friend.
+// Falls back to the user's own bot token if the friend doesn't have a dedicated one.
+func (c *Config) ResolveSendBotToken(friendName string) (string, error) {
+	if f, ok := c.Friends[friendName]; ok {
+		if f.SendBotToken != "" {
+			return f.SendBotToken, nil
+		}
+		return c.Telegram.BotToken, nil
+	}
+	return "", fmt.Errorf("friend %q not found", friendName)
+}
+
+// FriendsWithMeta returns friends for the API — does NOT expose send_bot_token.
 func (c *Config) FriendsWithMeta() []map[string]string {
 	result := make([]map[string]string, 0, len(c.Friends))
-	for name, chatID := range c.Friends {
+	for name, f := range c.Friends {
+		hasToken := "false"
+		if f.SendBotToken != "" {
+			hasToken = "true"
+		}
 		result = append(result, map[string]string{
-			"name":    name,
-			"chat_id": chatID,
-			"added":   time.Now().Format("2006-01-02"),
+			"name":               name,
+			"chat_id":            f.ChatID,
+			"added":              f.Added,
+			"has_send_bot_token": hasToken,
 		})
 	}
 	return result

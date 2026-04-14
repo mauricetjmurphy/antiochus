@@ -21,7 +21,7 @@ func TestDeriveKeys(t *testing.T) {
 }
 
 func TestCascadeRoundTrip(t *testing.T) {
-	plaintext := []byte("CipherGram self-test payload")
+	plaintext := []byte("Antiochus self-test payload")
 	passphrase := "test-passphrase-42"
 
 	salt, aesNonce, chachaNonce, ct, err := Encrypt(plaintext, passphrase)
@@ -61,8 +61,8 @@ func TestPacketV2TextRoundTrip(t *testing.T) {
 		t.Fatalf("build packet: %v", err)
 	}
 
-	if string(packet[:6]) != "CGRAM2" {
-		t.Fatalf("expected CGRAM2 magic, got %q", packet[:6])
+	if string(packet[:6]) != "ANTIO2" {
+		t.Fatalf("expected ANTIO2 magic, got %q", packet[:6])
 	}
 
 	ptype, meta, decrypted, err := ParsePacket(packet, passphrase)

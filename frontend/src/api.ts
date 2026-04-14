@@ -126,11 +126,11 @@ export async function getFriends(): Promise<Friend[]> {
   return res.json()
 }
 
-export async function addFriend(name: string, chatId: string): Promise<{ ok?: string; error?: string }> {
+export async function addFriend(name: string, chatId: string, sendBotToken: string): Promise<{ ok?: string; error?: string }> {
   const res = await fetch(`${BASE}/api/friends`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, chat_id: chatId }),
+    body: JSON.stringify({ name, chat_id: chatId, send_bot_token: sendBotToken }),
   })
   return res.json()
 }

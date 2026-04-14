@@ -1,7 +1,7 @@
 server:
     addr: 127.0.0.1:8080
 telegram:
-    bot_token: 8674771572:AAENLClntCW99p0rIBegX7dpEageFh3SLLc
+    bot_token: 8488267843:AAFVXNK05t7jSyLm0r-IjMCm-h-d2m00MIc
     chat_id: ""
     poll_timeout: 30
     max_file_size_mb: 45
@@ -12,4 +12,5 @@ crypto:
     argon2_parallelism: 4
 storage:
     max_messages_per_friend: 500
-friends: {}
+friends:
+    sina: "528574606"

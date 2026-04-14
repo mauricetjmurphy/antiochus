@@ -75,7 +75,16 @@ func (h *Handler) PostFriend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.Cfg.AddFriend(name, req.ChatID)
+	// If a send bot token is provided, validate it before saving
+	if req.SendBotToken != "" {
+		client := telegram.NewClient(req.SendBotToken)
+		if _, err := client.GetMe(); err != nil {
+			WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid send_bot_token: " + err.Error()})
+			return
+		}
+	}
+
+	h.Cfg.AddFriend(name, req.ChatID, req.SendBotToken)
 	if err := h.Cfg.Save(); err != nil {
 		WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "save config: " + err.Error()})
 		return
