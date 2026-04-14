@@ -1,4 +1,4 @@
-import { Friend, Message } from './types'
+import { Room, RoomCandidate, Message } from './types'
 
 const BASE = ''
 
@@ -27,18 +27,15 @@ async function encryptPassphrase(passphrase: string): Promise<{
   encrypted_passphrase: string
   iv: string
 }> {
-  // 1. Get server's public key
   const keyRes = await fetch(`${BASE}/api/session/key`)
   const { public_key: serverPubB64 } = await keyRes.json()
 
-  // 2. Generate client ECDH keypair
   const clientKeyPair = await crypto.subtle.generateKey(
     { name: 'ECDH', namedCurve: 'P-256' },
     true,
     ['deriveKey']
   )
 
-  // 3. Import server's public key
   const serverPubBytes = fromBase64(serverPubB64)
   const serverPubKey = await crypto.subtle.importKey(
     'raw',
@@ -48,7 +45,6 @@ async function encryptPassphrase(passphrase: string): Promise<{
     []
   )
 
-  // 4. Derive shared AES-256-GCM key via ECDH
   const sharedKey = await crypto.subtle.deriveKey(
     { name: 'ECDH', public: serverPubKey },
     clientKeyPair.privateKey,
@@ -57,10 +53,8 @@ async function encryptPassphrase(passphrase: string): Promise<{
     ['encrypt', 'decrypt']
   )
 
-  // Store for WS decryption
   sessionKey = sharedKey
 
-  // 5. Encrypt the passphrase with AES-256-GCM
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const encoded = new TextEncoder().encode(passphrase)
   const encrypted = await crypto.subtle.encrypt(
@@ -69,7 +63,6 @@ async function encryptPassphrase(passphrase: string): Promise<{
     encoded
   )
 
-  // 6. Export client public key as uncompressed point
   const clientPubRaw = await crypto.subtle.exportKey('raw', clientKeyPair.publicKey)
 
   return {
@@ -79,14 +72,11 @@ async function encryptPassphrase(passphrase: string): Promise<{
   }
 }
 
-// ── Decrypt an encrypted WS message ────────────────────────────
-
 export async function decryptWSMessage(encryptedPayload: string): Promise<string> {
   if (!sessionKey) {
     throw new Error('No session key')
   }
 
-  // Format: base64(iv) + "." + base64(ciphertext)
   const parts = encryptedPayload.split('.')
   if (parts.length !== 2) {
     throw new Error('Invalid encrypted payload format')
@@ -120,23 +110,29 @@ export async function setConfig(token: string): Promise<{ ok: boolean; bot_usern
   return res.json()
 }
 
-export async function getFriends(): Promise<Friend[]> {
-  const res = await fetch(`${BASE}/api/friends`)
-  if (!res.ok) throw new Error('Failed to load friends')
+export async function getRooms(): Promise<Room[]> {
+  const res = await fetch(`${BASE}/api/rooms`)
+  if (!res.ok) throw new Error('Failed to load rooms')
   return res.json()
 }
 
-export async function addFriend(name: string, chatId: string, sendBotToken: string): Promise<{ ok?: string; error?: string }> {
-  const res = await fetch(`${BASE}/api/friends`, {
+export async function getRoomCandidates(): Promise<RoomCandidate[]> {
+  const res = await fetch(`${BASE}/api/rooms/candidates`)
+  if (!res.ok) throw new Error('Failed to load room candidates')
+  return res.json()
+}
+
+export async function addRoom(name: string, chatId: string, title: string): Promise<{ ok?: string; error?: string }> {
+  const res = await fetch(`${BASE}/api/rooms`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, chat_id: chatId, send_bot_token: sendBotToken }),
+    body: JSON.stringify({ name, chat_id: chatId, title }),
   })
   return res.json()
 }
 
-export async function removeFriend(name: string): Promise<{ ok?: string; error?: string }> {
-  const res = await fetch(`${BASE}/api/friends/${name}`, { method: 'DELETE' })
+export async function removeRoom(name: string): Promise<{ ok?: string; error?: string }> {
+  const res = await fetch(`${BASE}/api/rooms/${name}`, { method: 'DELETE' })
   return res.json()
 }
 
@@ -157,8 +153,8 @@ export async function sendFile(to: string, file: File): Promise<{ ok?: boolean; 
   return res.json()
 }
 
-export async function getMessages(friend: string): Promise<Message[]> {
-  const res = await fetch(`${BASE}/api/messages/${friend}`)
+export async function getMessages(room: string): Promise<Message[]> {
+  const res = await fetch(`${BASE}/api/messages/${room}`)
   if (!res.ok) throw new Error('Failed to load messages')
   return res.json()
 }
@@ -178,10 +174,15 @@ export async function stopPolling(): Promise<void> {
   sessionKey = null
 }
 
+export async function fetchUpdates(): Promise<{ processed?: number; error?: string }> {
+  const res = await fetch(`${BASE}/api/poll/fetch`, { method: 'POST' })
+  return res.json()
+}
+
 export async function whoAmI(): Promise<{
   bot_username: string
   bot_id: string
-  chat_ids: { chat_id: string; username: string; source: string }[]
+  chat_ids: { chat_id: string; title: string; type: string; username: string; source: string }[]
   hint: string
   error?: string
 }> {

@@ -1,6 +1,7 @@
 package config
 
 import (
+	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +10,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+//go:embed prod.yml
+var defaultConfigYAML []byte
+
 // ── YAML config structure ──────────────────────────────────────
 
 type ServerConfig struct {
@@ -16,8 +20,7 @@ type ServerConfig struct {
 }
 
 type TelegramConfig struct {
-	BotToken         string `yaml:"bot_token"` // YOUR bot — you poll this for incoming messages
-	ChatID           string `yaml:"chat_id"`
+	BotToken         string `yaml:"bot_token"`
 	PollTimeout      int    `yaml:"poll_timeout"`
 	MaxFileSizeMB    int    `yaml:"max_file_size_mb"`
 	MessageCharLimit int    `yaml:"message_char_limit"`
@@ -30,45 +33,23 @@ type CryptoConfig struct {
 }
 
 type StorageConfig struct {
-	MaxMessagesPerFriend int `yaml:"max_messages_per_friend"`
+	MaxMessagesPerRoom int `yaml:"max_messages_per_room"`
 }
 
-// Friend represents a contact. ChatID is the friend's chat ID with their bot.
-// SendBotToken is the friend's bot token, which YOU use to send messages to them.
-type Friend struct {
-	ChatID       string `yaml:"chat_id"`
-	SendBotToken string `yaml:"send_bot_token"`
-	Added        string `yaml:"added,omitempty"`
-}
-
-// UnmarshalYAML supports both the new object format:
-//   alice:
-//     chat_id: "123"
-//     send_bot_token: "..."
-// and the legacy string format for backward compatibility:
-//   alice: "123"
-func (f *Friend) UnmarshalYAML(node *yaml.Node) error {
-	// Legacy string format: "alice: 123"
-	if node.Kind == yaml.ScalarNode {
-		f.ChatID = node.Value
-		return nil
-	}
-	// New object format
-	type friendAlias Friend
-	var a friendAlias
-	if err := node.Decode(&a); err != nil {
-		return err
-	}
-	*f = Friend(a)
-	return nil
+// Room represents a Telegram group chat used as an Antiochus room.
+// ChatID is the group's chat_id. Title is the group title from Telegram.
+type Room struct {
+	ChatID string `yaml:"chat_id"`
+	Title  string `yaml:"title,omitempty"`
+	Added  string `yaml:"added,omitempty"`
 }
 
 type Config struct {
-	Server   ServerConfig      `yaml:"server"`
-	Telegram TelegramConfig    `yaml:"telegram"`
-	Crypto   CryptoConfig      `yaml:"crypto"`
-	Storage  StorageConfig     `yaml:"storage"`
-	Friends  map[string]Friend `yaml:"friends"`
+	Server   ServerConfig    `yaml:"server"`
+	Telegram TelegramConfig  `yaml:"telegram"`
+	Crypto   CryptoConfig    `yaml:"crypto"`
+	Storage  StorageConfig   `yaml:"storage"`
+	Rooms    map[string]Room `yaml:"rooms"`
 	path     string
 }
 
@@ -90,9 +71,9 @@ func defaults() *Config {
 			Argon2Parallelism: 4,
 		},
 		Storage: StorageConfig{
-			MaxMessagesPerFriend: 500,
+			MaxMessagesPerRoom: 500,
 		},
-		Friends: make(map[string]Friend),
+		Rooms: make(map[string]Room),
 	}
 }
 
@@ -114,16 +95,18 @@ func configDir() string {
 }
 
 func configPath() string {
-	candidates := []string{
-		"internal/config/prod.yml",
-		filepath.Join(configDir(), "antiochus.yml"),
+	exe, err := os.Executable()
+	if err != nil {
+		return "internal/config/prod.yml"
 	}
-	for _, p := range candidates {
-		if _, err := os.Stat(p); err == nil {
-			return p
-		}
+	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = resolved
 	}
-	return candidates[len(candidates)-1]
+	return filepath.Join(filepath.Dir(exe), "internal", "config", "prod.yml")
+}
+
+func (c *Config) Path() string {
+	return c.path
 }
 
 func ReceivedDir() string {
@@ -139,17 +122,22 @@ func Load() (*Config, error) {
 
 	data, err := os.ReadFile(p)
 	if os.IsNotExist(err) {
-		return cfg, nil
-	}
-	if err != nil {
+		if err := os.MkdirAll(filepath.Dir(p), 0700); err != nil {
+			return nil, fmt.Errorf("create config dir: %w", err)
+		}
+		if err := os.WriteFile(p, defaultConfigYAML, 0600); err != nil {
+			return nil, fmt.Errorf("write default config: %w", err)
+		}
+		data = defaultConfigYAML
+	} else if err != nil {
 		return nil, fmt.Errorf("read config: %w", err)
 	}
 
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
-	if cfg.Friends == nil {
-		cfg.Friends = make(map[string]Friend)
+	if cfg.Rooms == nil {
+		cfg.Rooms = make(map[string]Room)
 	}
 	return cfg, nil
 }
@@ -177,54 +165,38 @@ func (c *Config) SetToken(token string) {
 	c.Telegram.BotToken = token
 }
 
-func (c *Config) AddFriend(name, chatID, sendBotToken string) {
-	c.Friends[name] = Friend{
-		ChatID:       chatID,
-		SendBotToken: sendBotToken,
-		Added:        time.Now().Format("2006-01-02"),
+func (c *Config) AddRoom(name, chatID, title string) {
+	c.Rooms[name] = Room{
+		ChatID: chatID,
+		Title:  title,
+		Added:  time.Now().Format("2006-01-02"),
 	}
 }
 
-func (c *Config) RemoveFriend(name string) bool {
-	if _, ok := c.Friends[name]; !ok {
+func (c *Config) RemoveRoom(name string) bool {
+	if _, ok := c.Rooms[name]; !ok {
 		return false
 	}
-	delete(c.Friends, name)
+	delete(c.Rooms, name)
 	return true
 }
 
-func (c *Config) ResolveChatID(friendName string) (string, error) {
-	if f, ok := c.Friends[friendName]; ok {
-		return f.ChatID, nil
+func (c *Config) ResolveChatID(name string) (string, error) {
+	if r, ok := c.Rooms[name]; ok {
+		return r.ChatID, nil
 	}
-	return "", fmt.Errorf("friend %q not found", friendName)
+	return "", fmt.Errorf("%q not found", name)
 }
 
-// ResolveSendBotToken returns the bot token used to send messages to this friend.
-// Falls back to the user's own bot token if the friend doesn't have a dedicated one.
-func (c *Config) ResolveSendBotToken(friendName string) (string, error) {
-	if f, ok := c.Friends[friendName]; ok {
-		if f.SendBotToken != "" {
-			return f.SendBotToken, nil
-		}
-		return c.Telegram.BotToken, nil
-	}
-	return "", fmt.Errorf("friend %q not found", friendName)
-}
-
-// FriendsWithMeta returns friends for the API — does NOT expose send_bot_token.
-func (c *Config) FriendsWithMeta() []map[string]string {
-	result := make([]map[string]string, 0, len(c.Friends))
-	for name, f := range c.Friends {
-		hasToken := "false"
-		if f.SendBotToken != "" {
-			hasToken = "true"
-		}
+// RoomsWithMeta returns rooms for the API.
+func (c *Config) RoomsWithMeta() []map[string]string {
+	result := make([]map[string]string, 0, len(c.Rooms))
+	for name, r := range c.Rooms {
 		result = append(result, map[string]string{
-			"name":               name,
-			"chat_id":            f.ChatID,
-			"added":              f.Added,
-			"has_send_bot_token": hasToken,
+			"name":    name,
+			"chat_id": r.ChatID,
+			"title":   r.Title,
+			"added":   r.Added,
 		})
 	}
 	return result

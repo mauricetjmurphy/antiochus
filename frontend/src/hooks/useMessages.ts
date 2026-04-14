@@ -4,23 +4,23 @@ import { Message } from '../types'
 export function useMessages() {
   const [messages, setMessages] = useState<Record<string, Message[]>>({})
 
-  const addMessage = useCallback((friend: string, msg: Message) => {
+  const addMessage = useCallback((room: string, msg: Message) => {
     setMessages(prev => ({
       ...prev,
-      [friend]: [...(prev[friend] || []), msg],
+      [room]: [...(prev[room] || []), msg],
     }))
   }, [])
 
-  const setFriendMessages = useCallback((friend: string, msgs: Message[]) => {
+  const setRoomMessages = useCallback((room: string, msgs: Message[]) => {
     setMessages(prev => ({
       ...prev,
-      [friend]: msgs,
+      [room]: msgs,
     }))
   }, [])
 
-  const getMessages = useCallback((friend: string): Message[] => {
-    return messages[friend] || []
+  const getMessages = useCallback((room: string): Message[] => {
+    return messages[room] || []
   }, [messages])
 
-  return { messages, addMessage, setFriendMessages, getMessages }
+  return { messages, addMessage, setRoomMessages, getMessages }
 }

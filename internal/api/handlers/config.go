@@ -58,12 +58,22 @@ func (h *Handler) PutConfig(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handler) GetFriends(w http.ResponseWriter, r *http.Request) {
-	WriteJSON(w, http.StatusOK, h.Cfg.FriendsWithMeta())
+func (h *Handler) GetRooms(w http.ResponseWriter, r *http.Request) {
+	WriteJSON(w, http.StatusOK, h.Cfg.RoomsWithMeta())
 }
 
-func (h *Handler) PostFriend(w http.ResponseWriter, r *http.Request) {
-	var req models.FriendRequest
+// GetRoomCandidates returns group chats the bot has seen that aren't yet
+// saved as rooms. The frontend polls this during the add-room flow.
+func (h *Handler) GetRoomCandidates(w http.ResponseWriter, r *http.Request) {
+	if h.RoomCandidates == nil {
+		WriteJSON(w, http.StatusOK, []map[string]string{})
+		return
+	}
+	WriteJSON(w, http.StatusOK, h.RoomCandidates())
+}
+
+func (h *Handler) PostRoom(w http.ResponseWriter, r *http.Request) {
+	var req models.RoomRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request"})
 		return
@@ -75,16 +85,7 @@ func (h *Handler) PostFriend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If a send bot token is provided, validate it before saving
-	if req.SendBotToken != "" {
-		client := telegram.NewClient(req.SendBotToken)
-		if _, err := client.GetMe(); err != nil {
-			WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid send_bot_token: " + err.Error()})
-			return
-		}
-	}
-
-	h.Cfg.AddFriend(name, req.ChatID, req.SendBotToken)
+	h.Cfg.AddRoom(name, req.ChatID, strings.TrimSpace(req.Title))
 	if err := h.Cfg.Save(); err != nil {
 		WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "save config: " + err.Error()})
 		return
@@ -93,12 +94,12 @@ func (h *Handler) PostFriend(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, map[string]string{"ok": "true"})
 }
 
-func (h *Handler) DeleteFriend(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) DeleteRoom(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 	name = strings.ToLower(strings.TrimSpace(name))
 
-	if !h.Cfg.RemoveFriend(name) {
-		WriteJSON(w, http.StatusNotFound, map[string]string{"error": "friend not found"})
+	if !h.Cfg.RemoveRoom(name) {
+		WriteJSON(w, http.StatusNotFound, map[string]string{"error": "room not found"})
 		return
 	}
 

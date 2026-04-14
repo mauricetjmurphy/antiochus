@@ -1,7 +1,15 @@
-export interface Friend {
+export interface Room {
   name: string
   chat_id: string
+  title?: string
   added: string
+}
+
+export interface RoomCandidate {
+  chat_id: string
+  title: string
+  type: string
+  first: string
 }
 
 export interface Message {
@@ -15,7 +23,7 @@ export interface Message {
 
 export interface WSEvent {
   type: 'new_message' | 'poll_status' | 'error'
-  friend?: string
+  room?: string
   message?: Message
   active?: boolean
   error?: string

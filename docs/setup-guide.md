@@ -1,136 +1,89 @@
 # Antiochus Setup Guide
 
-This guide walks you through setting up Antiochus for encrypted messaging between two people.
+Antiochus turns a Telegram group into an encrypted chat room. Messages are encrypted before they leave your machine and only decrypted by people who share the passphrase. Telegram never sees the plaintext.
 
 ## What You Need
 
-- The Antiochus binary (both you and your friend need a copy)
-- A Telegram account (both of you)
-- A shared passphrase (agreed on in person, phone call, or another secure channel)
+- The Antiochus binary (each participant needs a copy)
+- A Telegram account
+- A shared passphrase, agreed on out of band (in person, phone call, trusted channel)
 
-## Overview
+## How It Works
 
-Antiochus uses Telegram as a transport layer. Messages are encrypted before they leave your machine and only decrypted on the other end. Telegram never sees the plaintext.
+Each participant runs their own Telegram bot. Both bots live in the same Telegram group. When you send a message from the Antiochus app, your bot posts an encrypted blob to the group. The other participant's bot — also in the group — sees that post via `getUpdates` and their app decrypts it.
 
-The setup has three parts:
+Why each user needs their own bot: Telegram only allows one `getUpdates` consumer per bot token, and bot-sent messages never appear in the sender's own `getUpdates`. A shared bot cannot work for two pollers.
 
-1. Create a Telegram bot (the delivery mechanism)
-2. Get your chat ID (your "address" on Telegram)
-3. Exchange info with your friend and start chatting
+## Step 1: Create Your Bot
 
-## Step 1: Create a Telegram Bot
+1. Open Telegram and message **@BotFather**
+2. Send `/newbot`, pick a name and a `_bot`-suffixed username
+3. Copy the **bot token** BotFather gives you
 
-You need a Telegram bot to send and receive messages. Think of it as a private mail carrier — it moves encrypted envelopes between you and your friend.
+## Step 2: Disable Privacy Mode (critical)
 
-1. Open Telegram and search for **@BotFather**
-2. Send `/newbot`
-3. Choose a name (e.g. "My Cipher Bot")
-4. Choose a username (e.g. "my_cipher_1234_bot" — must end in `bot`)
-5. BotFather gives you a **bot token** — a long string like `123456789:ABCdefGHIjklMNOpqrsTUVwxyz1234567890`
-6. Save this token
+By default a bot in a group only sees messages that @mention it. For Antiochus the bot must see every message.
 
-**Important:** Both you and your friend need to **message this bot** on Telegram (just send "hi"). Telegram bots can't initiate conversations — a user must message the bot first before the bot can send messages to them.
+1. Message **@BotFather**
+2. Send `/setprivacy`
+3. Pick your bot
+4. Choose **Disable**
 
-You can either:
-- **Share one bot** — you create the bot, give your friend the username, they message it too
-- **Use two bots** — you each create your own bot. You message their bot, they message yours
+Privacy mode changes only take effect after the bot is re-added to the group, so do this *before* adding the bot to any group, or remove and re-add the bot later.
 
-One shared bot is simpler.
-
-## Step 2: Get Your Chat ID
-
-Your chat ID is your address on Telegram. Your friend needs it to send encrypted messages to you (and you need theirs).
-
-### Option A: Use Antiochus
+## Step 3: Configure the App
 
 1. Run the binary: `./antiochus`
 2. Open http://127.0.0.1:8080
-3. Enter any passphrase and unlock
-4. Click the gear icon (Settings)
-5. Paste your bot token and save
-6. Your chat ID appears automatically under "Your Chat IDs"
-7. If nothing shows up, go to Telegram, send any message to your bot, then click **Refresh**
+3. Enter a passphrase (the same passphrase every participant will use) and unlock
+4. Click the gear icon (Settings) and paste your bot token
 
-### Option B: Use @userinfobot
+## Step 4: Create a Room
 
-1. Open Telegram and search for **@userinfobot**
-2. Send it any message
-3. It replies with your chat ID
+1. Click **+** in the sidebar to open the New Room dialog
+2. Click **Open Telegram →**. Telegram opens and asks which group to add your bot to — pick an existing group or create a new one
+3. Invite the other participant to the group (via Telegram's invite link)
+4. Ask them to:
+   - Create their own bot (Step 1)
+   - Disable privacy mode on it (Step 2)
+   - Add their bot to the same group
+5. Send any message in the group. The group appears under **Detected Groups** in the Antiochus dialog
+6. Click the detected group, give it a local name (e.g. `project-alpha`), and save
 
-## Step 3: Exchange Info With Your Friend
+Each participant repeats step 6 on their own machine to add the same room.
 
-You and your friend need to share three things **securely** (in person, phone call, or another trusted channel — not over unencrypted text):
+## Step 5: Chat
 
-| What | Example | Who needs it |
-|------|---------|-------------|
-| Bot token | `123456789:ABCdef...7890` | Both of you (if sharing one bot) |
-| Your chat ID | `523841967` | Your friend adds this |
-| Their chat ID | `891234567` | You add this |
-| Passphrase | `correct horse battery staple` | Both of you (must be identical) |
-
-**The passphrase must be exactly the same on both sides.** It's the shared secret that derives the encryption keys. If it's different by even one character, decryption fails.
-
-## Step 4: Configure Antiochus
-
-### Your machine
-
-1. Run `./antiochus` and open http://127.0.0.1:8080
-2. Enter the shared passphrase
-3. Settings → paste the bot token → Save
-4. Click **+** (Add Friend) → name: `alice`, chat ID: `891234567` (your friend's ID)
-
-### Your friend's machine
-
-1. They run `./antiochus` and open http://127.0.0.1:8080
-2. They enter the **same** passphrase
-3. Settings → paste the same bot token → Save
-4. They click **+** → name: `you`, chat ID: `523841967` (your ID)
-
-### Alternative: Edit the config file directly
-
-Both of you can also edit `~/.antiochus/antiochus.yml` (or `internal/config/prod.yml`):
-
-```yaml
-telegram:
-  bot_token: "YOUR_BOT_TOKEN_HERE"
-
-friends:
-  alice: "891234567"
-```
-
-## Step 5: Start Chatting
-
-1. Select your friend in the sidebar
+1. Select the room in the sidebar
 2. Type a message and hit Enter
-3. The message is encrypted and sent through Telegram
-4. Your friend sees it decrypted in their browser in real time
+
+The message is encrypted, posted to the group by your bot, seen by the other bot, and decrypted on the other side. Click **Refresh** on the chat header to pull new messages.
 
 ### Sending files
 
-Click the paperclip icon next to the message input to send an encrypted file (up to 45 MB). The file arrives in Telegram as `antiochus.enc` — unreadable without the passphrase. Your friend's app decrypts it and saves it to `~/.antiochus/received/`.
+Click the paperclip icon next to the message input to send an encrypted file (up to 45 MB). The file arrives in the group as `antiochus.enc` — unreadable without the passphrase. The recipient's app decrypts it and saves it to `~/.antiochus/received/`.
 
 ## What Each Party Sees
 
 | Where | What you see |
 |-------|-------------|
 | Your browser | Plaintext messages and files |
-| Telegram chat | `🔐 Antiochus` + encrypted gibberish, or `antiochus.enc` files |
-| Your friend's browser | Plaintext messages and files |
-| Anyone else looking at Telegram | Encrypted gibberish only |
+| Telegram group | `🔐 Antiochus` + encrypted gibberish, or `antiochus.enc` files |
+| Other participants' browsers | Plaintext messages and files (with matching passphrase) |
+| Anyone else in the group | Encrypted gibberish only |
 
 ## Troubleshooting
 
 **"Bot token not configured"**
 → Open Settings (gear icon) and paste your bot token.
 
-**Messages not appearing**
-→ Make sure both sides are using the exact same passphrase. Even one character difference means decryption fails silently.
+**No groups detected in the New Room dialog**
+→ Post a message in the group after both bots have been added. The app pulls updates automatically every couple of seconds while the dialog is open.
 
-**"Send any message to @yourbot on Telegram"**
-→ You (or your friend) haven't messaged the bot yet. Go to Telegram, find the bot by username, and send it any message. Then refresh.
-
-**Friend's messages not arriving**
-→ Check that the chat ID in your friends list matches their actual Telegram chat ID. They can verify theirs in Settings → Who Am I.
+**Messages from other participants not appearing**
+- Make sure every participant uses the exact same passphrase. One character off = silent decryption failure.
+- Make sure privacy mode is disabled on every participant's bot, and that each bot was re-added to the group after disabling.
+- Check that both bots are still members of the group.
 
 **File too large**
-→ Max file size is 45 MB (Telegram's limit is 50 MB, we leave margin for encryption overhead). This is configurable in `antiochus.yml` under `telegram.max_file_size_mb`.
+→ Max file size is 45 MB (Telegram's hard limit is 50 MB — we leave margin for encryption overhead). Configurable in `prod.yml` under `telegram.max_file_size_mb`.

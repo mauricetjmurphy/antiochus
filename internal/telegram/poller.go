@@ -12,13 +12,16 @@ import (
 )
 
 type IncomingMessage struct {
-	Sender   string
-	ChatID   int64
-	Content  string
-	Type     string // "text" or "file"
-	Filename string
-	FilePath string // local save path for files
-	Time     string
+	Sender       string
+	SenderUserID int64 // Telegram user ID (stable across bots)
+	ChatID       int64
+	ChatType     string // "private", "group", "supergroup", "channel"
+	ChatTitle    string // group/channel title if applicable
+	Content      string
+	Type         string // "text" or "file"
+	Filename     string
+	FilePath     string // local save path for files
+	Time         string
 }
 
 type Poller struct {
@@ -58,6 +61,29 @@ func (p *Poller) Start() {
 	go p.pollLoop()
 }
 
+// FetchOnce performs a single getUpdates call with a short timeout and processes
+// any updates it finds. Returns the number of updates processed.
+func (p *Poller) FetchOnce() (int, error) {
+	log.Printf("[fetch] calling getUpdates offset=%d", p.offset)
+	updates, err := p.client.GetUpdates(p.offset, 0)
+	if err != nil {
+		log.Printf("[fetch] error: %v", err)
+		return 0, err
+	}
+	log.Printf("[fetch] getUpdates returned %d update(s)", len(updates))
+
+	count := 0
+	for _, update := range updates {
+		p.offset = update.UpdateID + 1
+		if update.Message == nil {
+			continue
+		}
+		p.processMessage(update.Message)
+		count++
+	}
+	return count, nil
+}
+
 func (p *Poller) Stop() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -82,16 +108,19 @@ func (p *Poller) pollLoop() {
 		default:
 		}
 
+		log.Printf("[poll] calling getUpdates offset=%d", p.offset)
 		updates, err := p.client.GetUpdates(p.offset, 30)
 		if err != nil {
-			log.Printf("poll error: %v", err)
+			log.Printf("[poll] error: %v", err)
 			time.Sleep(2 * time.Second)
 			continue
 		}
+		log.Printf("[poll] getUpdates returned %d update(s)", len(updates))
 
 		for _, update := range updates {
 			p.offset = update.UpdateID + 1
 			if update.Message == nil {
+				log.Printf("[poll] update %d has no message, skipping", update.UpdateID)
 				continue
 			}
 			p.processMessage(update.Message)
@@ -108,10 +137,17 @@ func (p *Poller) processMessage(msg *TgMessage) {
 		}
 	}
 	chatID := int64(0)
+	chatType := ""
+	chatTitle := ""
 	if msg.Chat != nil {
 		chatID = msg.Chat.ID
+		chatType = msg.Chat.Type
+		chatTitle = msg.Chat.Title
 	}
 	timestamp := time.Now().Format("15:04")
+
+	log.Printf("[poll] incoming message: sender=%s chatID=%d hasDoc=%v textLen=%d",
+		sender, chatID, msg.Document != nil, len(msg.Text))
 
 	p.mu.RLock()
 	passphrase := p.passphrase
@@ -142,31 +178,49 @@ func (p *Poller) processMessage(msg *TgMessage) {
 				return
 			}
 			p.msgChan <- IncomingMessage{
-				Sender:   sender,
-				ChatID:   chatID,
-				Content:  fmt.Sprintf("📎 %s", filename),
-				Type:     "file",
-				Filename: filename,
-				FilePath: savePath,
-				Time:     timestamp,
+				Sender:    sender,
+				ChatID:    chatID,
+				ChatType:  chatType,
+				ChatTitle: chatTitle,
+				Content:   fmt.Sprintf("📎 %s", filename),
+				Type:      "file",
+				Filename:  filename,
+				FilePath:  savePath,
+				Time:      timestamp,
 			}
 		} else {
 			p.msgChan <- IncomingMessage{
-				Sender:  sender,
-				ChatID:  chatID,
-				Content: string(plaintext),
-				Type:    "text",
-				Time:    timestamp,
+				Sender:    sender,
+				ChatID:    chatID,
+				ChatType:  chatType,
+				ChatTitle: chatTitle,
+				Content:   string(plaintext),
+				Type:      "text",
+				Time:      timestamp,
 			}
 		}
 		return
 	}
 
-	// Check for text messages with Antiochus payload
 	text := msg.Text
-	if !strings.Contains(text, "ANTIO") && !strings.Contains(text, "\U0001f510") {
+	if text == "" {
 		return
 	}
+
+	// Plain text (no Antiochus marker) — pass through as-is
+	if !strings.Contains(text, "ANTIO") && !strings.Contains(text, "\U0001f510") {
+		p.msgChan <- IncomingMessage{
+			Sender:    sender,
+			ChatID:    chatID,
+			ChatType:  chatType,
+			ChatTitle: chatTitle,
+			Content:   text,
+			Type:      "text",
+			Time:      timestamp,
+		}
+		return
+	}
+	log.Printf("[poll] found Antiochus payload in text from %s", sender)
 
 	clean := strings.ReplaceAll(text, "```", "")
 	clean = strings.ReplaceAll(clean, "\U0001f510 Antiochus", "")

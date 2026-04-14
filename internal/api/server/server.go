@@ -17,6 +17,13 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+type candidateRoom struct {
+	ChatID string
+	Title  string
+	Type   string
+	First  string
+}
+
 type Server struct {
 	cfg            *config.Config
 	hub            *WSHub
@@ -25,6 +32,8 @@ type Server struct {
 	poller         *telegram.Poller
 	messages       map[string][]*models.Message
 	msgMu          sync.RWMutex
+	candidates     map[string]candidateRoom // chat_id -> candidate room
+	candMu         sync.RWMutex
 	frontendFS     fs.FS
 	setupGuideHTML string
 }
@@ -35,6 +44,7 @@ func New(cfg *config.Config, frontendFS fs.FS, setupGuideMD string) *Server {
 		hub:            NewWSHub(),
 		router:         chi.NewRouter(),
 		messages:       make(map[string][]*models.Message),
+		candidates:     make(map[string]candidateRoom),
 		frontendFS:     frontendFS,
 		setupGuideHTML: renderMarkdownToHTML(setupGuideMD),
 	}
@@ -44,10 +54,9 @@ func New(cfg *config.Config, frontendFS fs.FS, setupGuideMD string) *Server {
 	s.handler = &handlers.Handler{
 		Cfg:        cfg,
 		Session:    session,
-		AddMessage: func(friend string, msg interface{}) { s.addMessage(friend, msg.(*models.Message)) },
-		GetMsgs:    func(friend string) interface{} { return s.getMessages(friend) },
+		AddMessage: func(room string, msg interface{}) { s.addMessage(room, msg.(*models.Message)) },
+		GetMsgs:    func(room string) interface{} { return s.getMessages(room) },
 		OnStartPoll: func(passphrase string) error {
-			// Once session is established, wire up WS encryption
 			s.hub.EncryptFunc = session.EncryptJSON
 			return s.startPolling(passphrase)
 		},
@@ -55,6 +64,10 @@ func New(cfg *config.Config, frontendFS fs.FS, setupGuideMD string) *Server {
 			s.stopPolling()
 			s.hub.EncryptFunc = nil
 		},
+		OnFetchUpdates: func() (int, error) {
+			return s.fetchUpdates()
+		},
+		RoomCandidates: s.listCandidates,
 	}
 
 	s.setupRoutes()
@@ -94,7 +107,6 @@ func (s *Server) ListenAndServe(addr string) error {
 	return http.ListenAndServe(addr, s.router)
 }
 
-// handleWSUpgrade validates the session before allowing a WebSocket connection.
 func (s *Server) handleWSUpgrade(w http.ResponseWriter, r *http.Request) {
 	if !s.handler.Session.HasPassphrase() {
 		http.Error(w, `{"error":"session not established"}`, http.StatusUnauthorized)
@@ -103,29 +115,77 @@ func (s *Server) handleWSUpgrade(w http.ResponseWriter, r *http.Request) {
 	s.hub.HandleUpgrade(w, r)
 }
 
-func (s *Server) addMessage(friend string, msg *models.Message) {
+func (s *Server) addMessage(room string, msg *models.Message) {
 	s.msgMu.Lock()
-	s.messages[friend] = append(s.messages[friend], msg)
-	if len(s.messages[friend]) > s.cfg.Storage.MaxMessagesPerFriend {
-		s.messages[friend] = s.messages[friend][len(s.messages[friend])-s.cfg.Storage.MaxMessagesPerFriend:]
+	s.messages[room] = append(s.messages[room], msg)
+	if len(s.messages[room]) > s.cfg.Storage.MaxMessagesPerRoom {
+		s.messages[room] = s.messages[room][len(s.messages[room])-s.cfg.Storage.MaxMessagesPerRoom:]
 	}
 	s.msgMu.Unlock()
 
+	log.Printf("[addMessage] room=%s sender=%s type=%s content=%q", room, msg.Sender, msg.Type, msg.Content)
+
 	s.hub.Broadcast(models.WSEvent{
 		Type:    "new_message",
-		Friend:  friend,
+		Room:    room,
 		Message: msg,
 	})
 }
 
-func (s *Server) getMessages(friend string) []*models.Message {
+func (s *Server) getMessages(room string) []*models.Message {
 	s.msgMu.RLock()
-	msgs := s.messages[friend]
+	msgs := s.messages[room]
 	s.msgMu.RUnlock()
 	if msgs == nil {
 		return []*models.Message{}
 	}
 	return msgs
+}
+
+func (s *Server) recordCandidate(chatID, title, chatType, first string) {
+	if chatID == "" || chatID == "0" {
+		return
+	}
+	// Only groups and supergroups are valid rooms
+	if chatType != "group" && chatType != "supergroup" {
+		return
+	}
+	s.candMu.Lock()
+	defer s.candMu.Unlock()
+	if _, ok := s.candidates[chatID]; ok {
+		return
+	}
+	s.candidates[chatID] = candidateRoom{ChatID: chatID, Title: title, Type: chatType, First: first}
+}
+
+func (s *Server) forgetCandidate(chatID string) {
+	s.candMu.Lock()
+	defer s.candMu.Unlock()
+	delete(s.candidates, chatID)
+}
+
+func (s *Server) listCandidates() []map[string]string {
+	// Build a set of chat_ids already saved as rooms so we don't return them.
+	saved := make(map[string]bool)
+	for _, r := range s.cfg.Rooms {
+		saved[r.ChatID] = true
+	}
+
+	s.candMu.RLock()
+	defer s.candMu.RUnlock()
+	out := make([]map[string]string, 0, len(s.candidates))
+	for _, c := range s.candidates {
+		if saved[c.ChatID] {
+			continue
+		}
+		out = append(out, map[string]string{
+			"chat_id": c.ChatID,
+			"title":   c.Title,
+			"type":    c.Type,
+			"first":   c.First,
+		})
+	}
+	return out
 }
 
 func (s *Server) startPolling(passphrase string) error {
@@ -155,24 +215,38 @@ func (s *Server) stopPolling() {
 	s.hub.Broadcast(models.WSEvent{Type: "poll_status", Active: false})
 }
 
+func (s *Server) fetchUpdates() (int, error) {
+	if s.poller == nil {
+		return 0, fmt.Errorf("poller not initialized — unlock first")
+	}
+	return s.poller.FetchOnce()
+}
+
 func (s *Server) bridgeMessages() {
 	if s.poller == nil {
 		return
 	}
 
 	for msg := range s.poller.Messages() {
-		friendName := ""
 		chatIDStr := fmt.Sprintf("%d", msg.ChatID)
-		for name, f := range s.cfg.Friends {
-			if f.ChatID == chatIDStr {
-				friendName = name
+
+		target := ""
+		for name, r := range s.cfg.Rooms {
+			if r.ChatID == chatIDStr {
+				target = name
 				break
 			}
 		}
-		if friendName == "" {
-			friendName = msg.Sender
+
+		if target == "" {
+			// Unknown chat — record as a candidate if it's a group chat.
+			// Private chats (friend setup) aren't auto-detected; users add them manually.
+			s.recordCandidate(chatIDStr, msg.ChatTitle, msg.ChatType, msg.Time)
+			log.Printf("[bridge] unknown chatID=%s (type=%s, title=%q) — candidate", chatIDStr, msg.ChatType, msg.ChatTitle)
+			continue
 		}
 
+		log.Printf("[bridge] matched chatID=%s to %s", chatIDStr, target)
 		m := &models.Message{
 			Time:     msg.Time,
 			Sender:   msg.Sender,
@@ -181,6 +255,7 @@ func (s *Server) bridgeMessages() {
 			Filename: msg.Filename,
 			FilePath: msg.FilePath,
 		}
-		s.addMessage(friendName, m)
+		s.addMessage(target, m)
+		s.forgetCandidate(chatIDStr)
 	}
 }

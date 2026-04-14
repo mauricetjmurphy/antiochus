@@ -1,27 +1,26 @@
-import { Friend, Message } from '../types'
-import FriendItem from './FriendItem'
+import { Room, Message } from '../types'
+import RoomItem from './RoomItem'
 
 interface Props {
-  friends: Friend[]
+  rooms: Room[]
   selected: string | null
   onSelect: (name: string) => void
   onAddClick: () => void
   onSettingsClick: () => void
-  getLastMessage: (friend: string) => Message | undefined
+  getLastMessage: (room: string) => Message | undefined
 }
 
-export default function Sidebar({ friends, selected, onSelect, onAddClick, onSettingsClick, getLastMessage }: Props) {
+export default function Sidebar({ rooms, selected, onSelect, onAddClick, onSettingsClick, getLastMessage }: Props) {
   return (
     <div className="w-72 bg-cg-bg border-r border-cg-border flex flex-col h-full">
-      {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-cg-border">
-        <h2 className="font-display font-semibold text-sm text-white">Friends</h2>
+        <h2 className="font-display font-semibold text-sm text-white">Rooms</h2>
         <div className="flex gap-1">
           <button
             onClick={onAddClick}
             className="w-9 h-9 flex items-center justify-center rounded-md text-cg-muted
                        hover:bg-cg-panel hover:text-cg-accent transition-colors text-xl"
-            title="Add friend"
+            title="Add room"
           >
             +
           </button>
@@ -36,26 +35,25 @@ export default function Sidebar({ friends, selected, onSelect, onAddClick, onSet
         </div>
       </div>
 
-      {/* Friend list */}
       <div className="flex-1 overflow-y-auto">
-        {friends.length === 0 ? (
+        {rooms.length === 0 ? (
           <div className="px-4 py-8 text-center">
-            <p className="text-cg-muted text-sm mb-2">No friends yet</p>
+            <p className="text-cg-muted text-sm mb-2">No rooms yet</p>
             <button
               onClick={onAddClick}
               className="text-cg-accent text-sm hover:underline"
             >
-              Add your first friend
+              Create your first room
             </button>
           </div>
         ) : (
-          friends.map(f => (
-            <FriendItem
-              key={f.name}
-              friend={f}
-              selected={selected === f.name}
-              lastMessage={getLastMessage(f.name)}
-              onClick={() => onSelect(f.name)}
+          rooms.map(r => (
+            <RoomItem
+              key={r.name}
+              room={r}
+              selected={selected === r.name}
+              lastMessage={getLastMessage(r.name)}
+              onClick={() => onSelect(r.name)}
             />
           ))
         )}

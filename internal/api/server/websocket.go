@@ -63,7 +63,9 @@ func (h *WSHub) Run() {
 		case client := <-h.register:
 			h.mu.Lock()
 			h.clients[client] = true
+			count := len(h.clients)
 			h.mu.Unlock()
+			log.Printf("[ws] client registered, total clients=%d", count)
 
 		case client := <-h.unregister:
 			h.mu.Lock()
@@ -71,9 +73,15 @@ func (h *WSHub) Run() {
 				delete(h.clients, client)
 				close(client.send)
 			}
+			count := len(h.clients)
 			h.mu.Unlock()
+			log.Printf("[ws] client unregistered, total clients=%d", count)
 
 		case event := <-h.broadcast:
+			h.mu.Lock()
+			clientCount := len(h.clients)
+			h.mu.Unlock()
+			log.Printf("[ws] broadcasting event type=%s friend=%s to %d client(s)", event.Type, event.Room, clientCount)
 			var data []byte
 			var err error
 

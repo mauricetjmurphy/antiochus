@@ -1,26 +1,30 @@
 # Antiochus
 
-Encrypted messaging over Telegram with a WhatsApp-like web UI, compiled into a single binary.
+Encrypted messaging over Telegram with a web UI, compiled into a single binary.
 
-Both parties run the same binary on their machines. Messages are cascade-encrypted (AES-256-GCM + ChaCha20-Poly1305) before they touch Telegram's servers — the transport is untrusted, only the endpoints matter.
+Antiochus turns a Telegram group into an encrypted chat room. Each participant runs their own Telegram bot; both bots live in the same group. Messages are cascade-encrypted (AES-256-GCM + ChaCha20-Poly1305) before they touch Telegram's servers — the transport is untrusted, only the endpoints matter.
 
 **New here?** Read the [Setup Guide](docs/setup-guide.md) to get started.
 
 ## How It Works
 
 ```
-You                          Telegram                        Friend
- |                              |                              |
- |  plaintext                   |                              |
- |  -> Argon2id KDF             |                              |
- |  -> AES-256-GCM              |                              |
- |  -> ChaCha20-Poly1305        |                              |
- |  -> base64/document    ---->  |  (encrypted blob)     ---->  |
- |                              |                              |  -> ChaCha20 decrypt
- |                              |                              |  -> AES-GCM decrypt
- |                              |                              |  -> plaintext
+You                       Telegram Group                  Friend
+ |                              |                           |
+ |  plaintext                   |                           |
+ |  -> Argon2id KDF             |                           |
+ |  -> AES-256-GCM              |                           |
+ |  -> ChaCha20-Poly1305        |                           |
+ |  -> base64/document          |                           |
+ |  -> YourBot posts ---------> |                           |
+ |                              | <-- FriendBot getUpdates  |
+ |                              |                           |  -> ChaCha20 decrypt
+ |                              |                           |  -> AES-GCM decrypt
+ |                              |                           |  -> plaintext
 ```
 
+- Each user has their own bot; both bots are members of a shared Telegram group
+- Both bots must have privacy mode disabled (so they see all group messages)
 - 512-bit effective key material (two independent 256-bit keys)
 - Argon2id KDF: 256 MB memory, 4 iterations, 4 threads
 - Random salt + nonces per message
@@ -32,7 +36,7 @@ You                          Telegram                        Friend
 
 - Go 1.23+
 - Node.js 18+
-- A Telegram bot token from [@BotFather](https://t.me/BotFather)
+- A Telegram bot token from [@BotFather](https://t.me/BotFather), with privacy mode disabled (`/setprivacy` → Disable)
 
 ### Build
 
@@ -52,7 +56,7 @@ dist/antiochus    # ~7.5 MB single binary
 ./dist/antiochus
 ```
 
-Open http://127.0.0.1:8080 in your browser. Enter a passphrase, configure your bot token in Settings, add friends, and start chatting.
+Open http://127.0.0.1:8080 in your browser. Enter a passphrase, configure your bot token in Settings, create a room (which guides you through making a Telegram group and pairing both bots), and start chatting.
 
 A setup guide is available at http://127.0.0.1:8080/guide (also linked from the login screen).
 
@@ -74,19 +78,18 @@ dist/antiochus-windows-amd64.exe
 dist/antiochus-windows-arm64.exe
 ```
 
-No dependencies to install — it's a single file. They run it, open the browser, set the same bot token and passphrase, and you're connected.
+No dependencies to install — it's a single file. They run it, open the browser, configure their own bot token, and join the shared room.
 
 ## Configuration
 
-Config file: `~/.antiochus/antiochus.yml` (also checks `internal/config/prod.yml` in the working directory first)
+Config file: `internal/config/prod.yml` (next to the binary).
 
 ```yaml
 server:
   addr: "127.0.0.1:8080"
 
 telegram:
-  bot_token: ""              # from @BotFather
-  chat_id: ""                # optional default recipient
+  bot_token: ""              # from @BotFather — privacy mode must be disabled
   poll_timeout: 30
   max_file_size_mb: 45
   message_char_limit: 4000
@@ -97,14 +100,16 @@ crypto:
   argon2_parallelism: 4
 
 storage:
-  max_messages_per_friend: 500
+  max_messages_per_room: 500
 
-friends:
-  alice: "123456789"
-  bob: "987654321"
+rooms:
+  project-alpha:
+    chat_id: "-1001234567890"
+    title: "Project Alpha Group"
+    added: "2026-04-14"
 ```
 
-The bot token and friends can also be configured from the web UI (Settings gear + Add Friend button).
+The bot token and rooms can also be configured from the web UI (Settings gear + **+** button in the sidebar).
 
 ### CLI Flags
 
@@ -120,8 +125,7 @@ The bot token and friends can also be configured from the web UI (Settings gear 
 - **Encrypted WebSocket** — real-time messages encrypted with AES-256-GCM using the session shared key
 - **Session authentication** — all API endpoints require an established session (ECDH handshake)
 - **File transfer** — send encrypted files up to 45 MB via Telegram documents
-- **Friends list** — manage contacts by name, add/remove from the UI or config
-- **Who Am I** — auto-discovers your Telegram chat ID in Settings
+- **Rooms** — group chats mapped to local names; guided setup auto-detects new groups from Telegram updates
 - **Wire format v2** — ANTIO2 packets with type byte + metadata header (filename for files)
 - **Cross-platform** — single binary for Linux, macOS, and Windows (amd64 + arm64)
 - **Setup guide** — built-in guide served at `/guide`, linked from the login screen
@@ -146,14 +150,15 @@ The bot token and friends can also be configured from the web UI (Settings gear 
 
 - Encrypted text blobs or binary `.enc` files — cannot read message content
 - File captions show the filename (e.g. `📎 report.pdf`) but file contents are encrypted
-- Message metadata (who sent to whom, when) is visible to Telegram
+- Group membership and message metadata (who posted when) visible to Telegram
 
 ### Threat model
 
 - The binary binds to `127.0.0.1` by default — binding to `0.0.0.0` prints a warning
 - WebSocket origin is restricted to `localhost` and `127.0.0.1` (blocks cross-site hijacking)
-- Both parties must share the same passphrase out of band (in person, phone call, etc.)
+- All participants must share the same passphrase out of band (in person, phone call, etc.)
 - No forward secrecy — the same passphrase is reused across messages
+- Anyone with access to the Telegram group can collect encrypted blobs; without the passphrase they're meaningless, but you should treat group membership as sensitive
 
 ## Development
 
@@ -184,21 +189,20 @@ antiochus/
 ├── main.go                     # Entrypoint, go:embed, CLI flags
 ├── Makefile                    # Build targets
 ├── docs/
-│   ├── setup-guide.md          # User-facing setup guide (embedded in binary)
-│   └── implementation-plan.md  # Architecture decisions
+│   └── setup-guide.md          # User-facing setup guide (embedded in binary)
 ├── internal/
 │   ├── api/
-│   │   ├── handlers/           # HTTP handlers (config, messages, crypto, whoami, session)
+│   │   ├── handlers/           # HTTP handlers (config, messages, rooms, crypto, whoami, session)
 │   │   ├── middleware/         # Session authentication middleware
 │   │   └── server/             # Chi router, WebSocket hub, polling, guide renderer
 │   ├── config/                 # YAML config load/save
 │   ├── crypto/                 # Argon2id KDF, AES+ChaCha cascade, wire format
 │   ├── models/                 # Shared types (Message, WSEvent, etc.)
-│   └── telegram/               # Bot API client, long-poll goroutine, file handling
+│   └── telegram/               # Bot API client, poller, file handling
 └── frontend/                   # Vite + React + TypeScript + Tailwind
     └── src/
         ├── api.ts              # ECDH key exchange, REST client, WS decryption
-        ├── components/         # PassphraseGate, Sidebar, ChatPanel, Settings, etc.
+        ├── components/         # PassphraseGate, Sidebar, ChatPanel, AddRoomModal, Settings, etc.
         └── hooks/              # useWebSocket, useMessages
 ```
 

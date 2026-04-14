@@ -36,9 +36,8 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sendToken, err := h.Cfg.ResolveSendBotToken(req.To)
-	if err != nil || sendToken == "" {
-		WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "no bot token available to send to this friend"})
+	if h.Cfg.Telegram.BotToken == "" {
+		WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "bot token not configured"})
 		return
 	}
 
@@ -49,7 +48,7 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := telegram.NewClient(sendToken)
+	client := telegram.NewClient(h.Cfg.Telegram.BotToken)
 
 	encoded := base64.StdEncoding.EncodeToString(packet)
 	if len(encoded) <= h.Cfg.Telegram.MessageCharLimit {
@@ -107,9 +106,8 @@ func (h *Handler) SendFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sendToken, err := h.Cfg.ResolveSendBotToken(to)
-	if err != nil || sendToken == "" {
-		WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "no bot token available to send to this friend"})
+	if h.Cfg.Telegram.BotToken == "" {
+		WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "bot token not configured"})
 		return
 	}
 
@@ -142,7 +140,7 @@ func (h *Handler) SendFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := telegram.NewClient(sendToken)
+	client := telegram.NewClient(h.Cfg.Telegram.BotToken)
 	caption := fmt.Sprintf("\U0001f510 Antiochus [\U0001f4ce %s]", filename)
 	if err := client.SendDocument(chatID, packet, "antiochus.enc", caption); err != nil {
 		WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "send: " + err.Error()})
@@ -162,12 +160,12 @@ func (h *Handler) SendFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetMessages(w http.ResponseWriter, r *http.Request) {
-	friend := chi.URLParam(r, "friend")
-	if friend == "" {
-		WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "friend name required"})
+	room := chi.URLParam(r, "room")
+	if room == "" {
+		WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "room name required"})
 		return
 	}
 
-	msgs := h.GetMsgs(friend)
+	msgs := h.GetMsgs(room)
 	WriteJSON(w, http.StatusOK, msgs)
 }

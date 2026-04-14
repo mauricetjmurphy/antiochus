@@ -231,3 +231,17 @@ func (h *Handler) StopPoll(w http.ResponseWriter, r *http.Request) {
 	h.Session.Clear()
 	WriteJSON(w, http.StatusOK, map[string]string{"ok": "true"})
 }
+
+// FetchUpdates triggers a one-shot getUpdates call on the poller.
+func (h *Handler) FetchUpdates(w http.ResponseWriter, r *http.Request) {
+	if h.OnFetchUpdates == nil {
+		WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "fetch not wired up"})
+		return
+	}
+	count, err := h.OnFetchUpdates()
+	if err != nil {
+		WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]int{"processed": count})
+}

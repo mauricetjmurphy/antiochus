@@ -59,7 +59,7 @@ func main() {
 
 	fmt.Printf("\n  \033[92m\033[1m🔐 Antiochus v%s\033[0m\n", version)
 	fmt.Printf("  \033[2mOpen http://%s in your browser\033[0m\n", listenAddr)
-	fmt.Printf("  \033[2mConfig: ~/.antiochus/antiochus.yml\033[0m\n\n")
+	fmt.Printf("  \033[2mConfig: %s\033[0m\n\n", cfg.Path())
 
 	if err := srv.ListenAndServe(listenAddr); err != nil {
 		log.Fatalf("server: %v", err)

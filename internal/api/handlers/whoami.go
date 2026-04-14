@@ -21,38 +21,25 @@ func (h *Handler) WhoAmI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Collect chat IDs from multiple sources:
-	// 1. The config's default chat_id
-	// 2. All friends' chat IDs
-	// 3. A short-poll of recent Telegram updates (offset=-1 gets the last update only)
 	seen := make(map[string]bool)
 	type chatInfo struct {
 		ChatID   string `json:"chat_id"`
+		Title    string `json:"title"`
+		Type     string `json:"type"`
 		Username string `json:"username"`
 		Source   string `json:"source"`
 	}
 	chats := make([]chatInfo, 0)
 
-	// From config default
-	if h.Cfg.Telegram.ChatID != "" && !seen[h.Cfg.Telegram.ChatID] {
-		seen[h.Cfg.Telegram.ChatID] = true
-		chats = append(chats, chatInfo{
-			ChatID: h.Cfg.Telegram.ChatID, Username: "", Source: "config",
-		})
-	}
-
-	// From friends list
-	for name, f := range h.Cfg.Friends {
-		if !seen[f.ChatID] {
-			seen[f.ChatID] = true
+	for name, r := range h.Cfg.Rooms {
+		if !seen[r.ChatID] {
+			seen[r.ChatID] = true
 			chats = append(chats, chatInfo{
-				ChatID: f.ChatID, Username: name, Source: "friend",
+				ChatID: r.ChatID, Title: r.Title, Username: name, Source: "room",
 			})
 		}
 	}
 
-	// Try to get the latest update from Telegram (short poll, won't block)
-	// Use offset -1 to get only the most recent update without consuming the queue
 	updates, err := client.GetUpdates(-1, 0)
 	if err == nil {
 		for _, u := range updates {
@@ -69,14 +56,18 @@ func (h *Handler) WhoAmI(w http.ResponseWriter, r *http.Request) {
 				username = u.Message.From.Username
 			}
 			chats = append(chats, chatInfo{
-				ChatID: cid, Username: username, Source: "telegram",
+				ChatID:   cid,
+				Title:    u.Message.Chat.Title,
+				Type:     u.Message.Chat.Type,
+				Username: username,
+				Source:   "telegram",
 			})
 		}
 	}
 
 	hint := ""
 	if len(chats) == 0 {
-		hint = fmt.Sprintf("Send any message to @%s on Telegram, then click again", me.Username)
+		hint = fmt.Sprintf("Add @%s to a Telegram group and post a message", me.Username)
 	}
 
 	WriteJSON(w, http.StatusOK, map[string]interface{}{

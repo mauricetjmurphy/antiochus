@@ -21,30 +21,26 @@ func (s *Server) setupRoutes() {
 	s.router.Post("/api/poll/start", h.StartPoll)
 	s.router.Get("/guide", s.handleGuide)
 
-	// Friends — public so they can be managed during initial setup
-	s.router.Get("/api/friends", h.GetFriends)
-	s.router.Post("/api/friends", h.PostFriend)
-	s.router.Delete("/api/friends/{name}", h.DeleteFriend)
+	// Rooms — public so they can be managed during initial setup
+	s.router.Get("/api/rooms", h.GetRooms)
+	s.router.Post("/api/rooms", h.PostRoom)
+	s.router.Delete("/api/rooms/{name}", h.DeleteRoom)
 
 	// ── Authenticated (session required) ─────────────────
 	s.router.Group(func(r chi.Router) {
 		r.Use(requireSession)
 
-		// Messages
 		r.Post("/api/messages/send", h.SendMessage)
 		r.Post("/api/messages/send-file", h.SendFile)
-		r.Get("/api/messages/{friend}", h.GetMessages)
+		r.Get("/api/messages/{room}", h.GetMessages)
 
-		// Decrypt
 		r.Post("/api/decrypt", h.Decrypt)
-
-		// Who am I
 		r.Get("/api/whoami", h.WhoAmI)
 
-		// Polling control
 		r.Post("/api/poll/stop", h.StopPoll)
+		r.Post("/api/poll/fetch", h.FetchUpdates)
+		r.Get("/api/rooms/candidates", h.GetRoomCandidates)
 	})
 
-	// ── WebSocket (authenticated via session token query param) ──
 	s.router.Get("/ws", s.handleWSUpgrade)
 }

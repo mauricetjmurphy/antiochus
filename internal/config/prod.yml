@@ -1,8 +1,7 @@
 server:
   addr: 127.0.0.1:8080
 telegram:
-  bot_token: ""
-  chat_id: ""
+  bot_token: 8674771572:AAHlEWCC1q8n5Nt09fIcXyRdBxswg93gD88
   poll_timeout: 30
   max_file_size_mb: 45
   message_char_limit: 4000
@@ -11,6 +10,5 @@ crypto:
   argon2_memory_mb: 256
   argon2_parallelism: 4
 storage:
-  max_messages_per_friend: 500
-friends:
-  sina: ""
+  max_messages_per_room: 500
+rooms: {}

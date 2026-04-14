@@ -47,7 +47,9 @@ type TgUser struct {
 }
 
 type TgChat struct {
-	ID int64 `json:"id"`
+	ID    int64  `json:"id"`
+	Type  string `json:"type"`  // "private", "group", "supergroup", "channel"
+	Title string `json:"title"` // group/channel title
 }
 
 type TgDocument struct {

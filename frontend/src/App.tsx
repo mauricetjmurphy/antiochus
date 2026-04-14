@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Friend, WSEvent } from './types'
+import { Room, WSEvent } from './types'
 import * as api from './api'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useMessages } from './hooks/useMessages'
@@ -7,26 +7,26 @@ import PassphraseGate from './components/PassphraseGate'
 import StatusBar from './components/StatusBar'
 import Sidebar from './components/Sidebar'
 import ChatPanel from './components/ChatPanel'
-import AddFriendModal from './components/AddFriendModal'
+import AddRoomModal from './components/AddRoomModal'
 import SettingsModal from './components/SettingsModal'
 
 export default function App() {
   const [passphrase, setPassphrase] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [friends, setFriends] = useState<Friend[]>([])
-  const [selectedFriend, setSelectedFriend] = useState<string | null>(null)
-  const [showAddFriend, setShowAddFriend] = useState(false)
+  const [rooms, setRooms] = useState<Room[]>([])
+  const [selectedRoom, setSelectedRoom] = useState<string | null>(null)
+  const [showAddRoom, setShowAddRoom] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [botName, setBotName] = useState('')
   const [tokenSet, setTokenSet] = useState(false)
   const [polling, setPolling] = useState(false)
 
-  const { addMessage, setFriendMessages, getMessages } = useMessages()
+  const { addMessage, setRoomMessages, getMessages } = useMessages()
 
   const handleWSEvent = useCallback((event: WSEvent) => {
-    if (event.type === 'new_message' && event.friend && event.message) {
-      addMessage(event.friend, event.message)
+    if (event.type === 'new_message' && event.room && event.message) {
+      addMessage(event.room, event.message)
     } else if (event.type === 'poll_status') {
       setPolling(!!event.active)
     }
@@ -34,7 +34,6 @@ export default function App() {
 
   const { connected } = useWebSocket(handleWSEvent, !!passphrase)
 
-  // Load config on mount
   useEffect(() => {
     api.getConfig().then(cfg => {
       setTokenSet(cfg.token_set)
@@ -42,28 +41,26 @@ export default function App() {
     }).catch(() => {})
   }, [])
 
-  // Load friends list
-  const loadFriends = useCallback(async () => {
+  const loadRooms = useCallback(async () => {
     try {
-      const f = await api.getFriends()
-      setFriends(f)
+      const r = await api.getRooms()
+      setRooms(r)
     } catch {
       // ignore
     }
   }, [])
 
   useEffect(() => {
-    if (passphrase) loadFriends()
-  }, [passphrase, loadFriends])
+    if (passphrase) loadRooms()
+  }, [passphrase, loadRooms])
 
-  // Load messages when selecting a friend
   useEffect(() => {
-    if (selectedFriend && passphrase) {
-      api.getMessages(selectedFriend).then(msgs => {
-        setFriendMessages(selectedFriend, msgs)
+    if (selectedRoom && passphrase) {
+      api.getMessages(selectedRoom).then(msgs => {
+        setRoomMessages(selectedRoom, msgs)
       }).catch(() => {})
     }
-  }, [selectedFriend, passphrase, setFriendMessages])
+  }, [selectedRoom, passphrase, setRoomMessages])
 
   const handleUnlock = async (pp: string) => {
     setLoading(true)
@@ -72,7 +69,6 @@ export default function App() {
       const cfg = await api.getConfig()
 
       if (!cfg.token_set) {
-        // Let user through to configure the token via Settings
         setPassphrase(pp)
         setShowSettings(true)
         return
@@ -83,7 +79,6 @@ export default function App() {
         setError(result.error)
         return
       }
-      // Only set passphrase (pass the gate) after successful handshake
       setPassphrase(pp)
       setPolling(true)
     } catch (err) {
@@ -94,31 +89,33 @@ export default function App() {
   }
 
   const handleSend = async (text: string) => {
-    if (!selectedFriend || !passphrase) return
-    const result = await api.sendMessage(selectedFriend, text)
+    if (!selectedRoom || !passphrase) return
+    const result = await api.sendMessage(selectedRoom, text)
     if (result.error) {
       alert(result.error)
     }
+  }
+
+  const handleRefresh = async (): Promise<number> => {
+    if (!selectedRoom) return 0
+    const before = getMessages(selectedRoom).length
+    const msgs = await api.getMessages(selectedRoom)
+    setRoomMessages(selectedRoom, msgs)
+    return Math.max(0, msgs.length - before)
   }
 
   const handleSendFile = async (file: File) => {
-    if (!selectedFriend || !passphrase) return
-    const result = await api.sendFile(selectedFriend, file)
+    if (!selectedRoom || !passphrase) return
+    const result = await api.sendFile(selectedRoom, file)
     if (result.error) {
       alert(result.error)
     }
   }
 
-  const handleAddFriend = async (name: string, chatId: string, sendBotToken: string) => {
-    const result = await api.addFriend(name, chatId, sendBotToken)
-    if (result.error) throw new Error(result.error)
-    await loadFriends()
-  }
-
-  const handleRemoveFriend = async (name: string) => {
-    await api.removeFriend(name)
-    if (selectedFriend === name) setSelectedFriend(null)
-    await loadFriends()
+  const handleRemoveRoom = async (name: string) => {
+    await api.removeRoom(name)
+    if (selectedRoom === name) setSelectedRoom(null)
+    await loadRooms()
   }
 
   const handleSaveToken = async (token: string) => {
@@ -127,24 +124,22 @@ export default function App() {
     setTokenSet(true)
     setBotName(result.bot_username)
 
-    // Start polling if we have a passphrase but weren't polling yet
     if (passphrase && !polling) {
       const pollResult = await api.startPolling(passphrase)
       if (!pollResult.error) {
         setPolling(true)
-        await loadFriends()
+        await loadRooms()
       }
     }
   }
 
-  const getLastMessage = (friend: string) => {
-    const msgs = getMessages(friend)
+  const getLastMessage = (room: string) => {
+    const msgs = getMessages(room)
     return msgs.length > 0 ? msgs[msgs.length - 1] : undefined
   }
 
-  const selectedFriendObj = friends.find(f => f.name === selectedFriend) ?? null
+  const selectedRoomObj = rooms.find(r => r.name === selectedRoom) ?? null
 
-  // Passphrase gate
   if (!passphrase) {
     return <PassphraseGate onSubmit={handleUnlock} loading={loading} error={error} />
   }
@@ -155,28 +150,30 @@ export default function App() {
 
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
-          friends={friends}
-          selected={selectedFriend}
-          onSelect={setSelectedFriend}
-          onAddClick={() => setShowAddFriend(true)}
+          rooms={rooms}
+          selected={selectedRoom}
+          onSelect={setSelectedRoom}
+          onAddClick={() => setShowAddRoom(true)}
           onSettingsClick={() => setShowSettings(true)}
           getLastMessage={getLastMessage}
         />
 
         <ChatPanel
-          friend={selectedFriendObj}
-          messages={selectedFriend ? getMessages(selectedFriend) : []}
+          room={selectedRoomObj}
+          messages={selectedRoom ? getMessages(selectedRoom) : []}
           onSend={handleSend}
           onSendFile={handleSendFile}
-          onRemoveFriend={handleRemoveFriend}
+          onRemoveRoom={handleRemoveRoom}
+          onRefresh={handleRefresh}
           disabled={!tokenSet}
         />
       </div>
 
-      <AddFriendModal
-        open={showAddFriend}
-        onClose={() => setShowAddFriend(false)}
-        onAdd={handleAddFriend}
+      <AddRoomModal
+        open={showAddRoom}
+        botUsername={botName}
+        onClose={() => setShowAddRoom(false)}
+        onAdded={loadRooms}
       />
 
       <SettingsModal

@@ -11,12 +11,17 @@ import (
 type Handler struct {
 	Cfg        *config.Config
 	Session    *Session
-	AddMessage func(friend string, msg interface{})
-	GetMsgs    func(friend string) interface{}
+	AddMessage func(room string, msg interface{})
+	GetMsgs    func(room string) interface{}
 
 	// Polling lifecycle callbacks — set by the server package
-	OnStartPoll func(passphrase string) error
-	OnStopPoll  func()
+	OnStartPoll    func(passphrase string) error
+	OnStopPoll     func()
+	OnFetchUpdates func() (int, error)
+
+	// RoomCandidates returns group chats the bot has received messages
+	// from that aren't yet configured as rooms.
+	RoomCandidates func() []map[string]string
 }
 
 func WriteJSON(w http.ResponseWriter, status int, data interface{}) {
