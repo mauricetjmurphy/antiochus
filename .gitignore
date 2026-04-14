@@ -58,3 +58,14 @@ Temporary Items
 *.icloud
 
 # End of https://www.toptal.com/developers/gitignore/api/go,macos
+
+### Antiochus ###
+# Local config with real tokens — never commit
+internal/config/prod.yml
+
+# Frontend build artifacts
+frontend/dist/
+frontend/node_modules/
+
+# Built binaries
+dist/

@@ -41,6 +41,28 @@ type Friend struct {
 	Added        string `yaml:"added,omitempty"`
 }
 
+// UnmarshalYAML supports both the new object format:
+//   alice:
+//     chat_id: "123"
+//     send_bot_token: "..."
+// and the legacy string format for backward compatibility:
+//   alice: "123"
+func (f *Friend) UnmarshalYAML(node *yaml.Node) error {
+	// Legacy string format: "alice: 123"
+	if node.Kind == yaml.ScalarNode {
+		f.ChatID = node.Value
+		return nil
+	}
+	// New object format
+	type friendAlias Friend
+	var a friendAlias
+	if err := node.Decode(&a); err != nil {
+		return err
+	}
+	*f = Friend(a)
+	return nil
+}
+
 type Config struct {
 	Server   ServerConfig      `yaml:"server"`
 	Telegram TelegramConfig    `yaml:"telegram"`
