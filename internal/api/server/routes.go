@@ -33,6 +33,7 @@ func (s *Server) setupRoutes() {
 		r.Post("/api/messages/send", h.SendMessage)
 		r.Post("/api/messages/send-file", h.SendFile)
 		r.Get("/api/messages/{room}", h.GetMessages)
+		r.Get("/api/files/{filename}", h.DownloadFile)
 
 		r.Post("/api/decrypt", h.Decrypt)
 		r.Get("/api/whoami", h.WhoAmI)

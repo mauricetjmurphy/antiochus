@@ -4,9 +4,16 @@ interface Props {
   message: Message
 }
 
+function basename(path: string): string {
+  const parts = path.split(/[\\/]/)
+  return parts[parts.length - 1] || path
+}
+
 export default function MessageBubble({ message }: Props) {
   const isMe = message.sender === 'you'
   const isFile = message.type === 'file'
+  const downloadName = message.filePath ? basename(message.filePath) : ''
+  const downloadable = isFile && !isMe && downloadName.length > 0
 
   return (
     <div className={`flex ${isMe ? 'justify-end' : 'justify-start'} mb-2`}>
@@ -20,9 +27,19 @@ export default function MessageBubble({ message }: Props) {
             {message.sender}
           </p>
         )}
-        <p className={`text-sm break-words ${isFile ? 'text-cg-accent' : 'text-white'}`}>
-          {message.content}
-        </p>
+        {downloadable ? (
+          <a
+            href={`/api/files/${encodeURIComponent(downloadName)}`}
+            download={message.filename || downloadName}
+            className="text-sm break-words text-cg-accent underline hover:no-underline"
+          >
+            {message.content}
+          </a>
+        ) : (
+          <p className={`text-sm break-words ${isFile ? 'text-cg-accent' : 'text-white'}`}>
+            {message.content}
+          </p>
+        )}
         <p className={`text-xs mt-1 ${isMe ? 'text-cg-accent/50' : 'text-cg-muted'}`}>
           {message.time}
         </p>

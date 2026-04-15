@@ -3,7 +3,7 @@ FRONTEND_DIR := frontend
 BINARY := antiochus
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
-.PHONY: all frontend backend clean dev-backend dev-frontend release test
+.PHONY: all frontend backend clean dev-backend dev-frontend release build-all test
 
 all: frontend backend
 
@@ -42,6 +42,8 @@ build-windows-arm64: frontend
 	CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o dist/$(BINARY)-windows-arm64.exe .
 
 release: build-linux-amd64 build-linux-arm64 build-darwin-amd64 build-darwin-arm64 build-windows-amd64 build-windows-arm64
+
+build-all: build-linux-amd64 build-linux-arm64 build-darwin-amd64 build-darwin-arm64 build-windows-386 build-windows-amd64 build-windows-arm64
 
 # ── Development ───────────────────────────────
 dev-backend:

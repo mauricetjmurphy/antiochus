@@ -67,6 +67,9 @@ func New(cfg *config.Config, frontendFS fs.FS, setupGuideMD string) *Server {
 		OnFetchUpdates: func() (int, error) {
 			return s.fetchUpdates()
 		},
+		OnTokenChanged: func() error {
+			return s.startPolling(session.Passphrase())
+		},
 		RoomCandidates: s.listCandidates,
 	}
 

@@ -24,7 +24,7 @@ You                       Telegram Group                  Friend
 ```
 
 - Each user has their own bot; both bots are members of a shared Telegram group
-- Both bots must have privacy mode disabled (so they see all group messages)
+- Both bots must have privacy mode disabled (`/setprivacy` → Disable) and Bot-to-Bot mode enabled (`/setbot2bot` → Enable), then be re-added to the group
 - 512-bit effective key material (two independent 256-bit keys)
 - Argon2id KDF: 256 MB memory, 4 iterations, 4 threads
 - Random salt + nonces per message
@@ -36,7 +36,7 @@ You                       Telegram Group                  Friend
 
 - Go 1.23+
 - Node.js 18+
-- A Telegram bot token from [@BotFather](https://t.me/BotFather), with privacy mode disabled (`/setprivacy` → Disable)
+- A Telegram bot token from [@BotFather](https://t.me/BotFather), with privacy mode disabled (`/setprivacy` → Disable) and Bot-to-Bot mode enabled (`/setbot2bot` → Enable)
 
 ### Build
 

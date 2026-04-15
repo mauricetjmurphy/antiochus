@@ -52,6 +52,14 @@ func (h *Handler) PutConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Restart the poller with the new token if a session is active
+	if h.OnTokenChanged != nil && h.Session.HasPassphrase() {
+		if err := h.OnTokenChanged(); err != nil {
+			WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": "restart poller: " + err.Error()})
+			return
+		}
+	}
+
 	WriteJSON(w, http.StatusOK, map[string]interface{}{
 		"ok":           true,
 		"bot_username": me.Username,

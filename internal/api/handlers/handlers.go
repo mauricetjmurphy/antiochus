@@ -18,6 +18,7 @@ type Handler struct {
 	OnStartPoll    func(passphrase string) error
 	OnStopPoll     func()
 	OnFetchUpdates func() (int, error)
+	OnTokenChanged func() error
 
 	// RoomCandidates returns group chats the bot has received messages
 	// from that aren't yet configured as rooms.

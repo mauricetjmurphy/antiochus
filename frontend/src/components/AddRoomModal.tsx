@@ -16,6 +16,10 @@ export default function AddRoomModal({ open, botUsername, onClose, onAdded }: Pr
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [polling, setPolling] = useState(false)
+  const [manualOpen, setManualOpen] = useState(false)
+  const [manualName, setManualName] = useState('')
+  const [manualChatID, setManualChatID] = useState('')
+  const [manualTitle, setManualTitle] = useState('')
 
   useEffect(() => {
     if (!open) return
@@ -23,6 +27,10 @@ export default function AddRoomModal({ open, botUsername, onClose, onAdded }: Pr
     setPicked(null)
     setName('')
     setError('')
+    setManualOpen(false)
+    setManualName('')
+    setManualChatID('')
+    setManualTitle('')
   }, [open])
 
   // Poll for candidates every 2s while modal is open and no candidate picked
@@ -71,6 +79,25 @@ export default function AddRoomModal({ open, botUsername, onClose, onAdded }: Pr
     }
   }
 
+  const handleManualSave = async () => {
+    const n = manualName.trim().toLowerCase()
+    const cid = manualChatID.trim()
+    const title = manualTitle.trim()
+    if (!n || !cid) return
+    setSubmitting(true)
+    setError('')
+    try {
+      const res = await api.addRoom(n, cid, title)
+      if (res.error) throw new Error(res.error)
+      await onAdded()
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add room')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
       <div
@@ -101,11 +128,16 @@ export default function AddRoomModal({ open, botUsername, onClose, onAdded }: Pr
                 <span className="text-white font-semibold">2.</span> Invite your friend to the group and have them add <em>their</em> own bot too.
               </li>
               <li>
-                <span className="text-white font-semibold">3.</span> Disable privacy mode on both bots via{' '}
+                <span className="text-white font-semibold">3.</span> In{' '}
                 <a href="https://t.me/BotFather" target="_blank" rel="noreferrer" className="text-cg-accent hover:underline">
                   @BotFather
                 </a>{' '}
-                → <code>/setprivacy</code> → Disable. Then remove and re-add each bot to the group.
+                on <em>both</em> bots:
+                <ul className="mt-1 ml-4 list-disc space-y-0.5 text-xs">
+                  <li><code>/setprivacy</code> → Disable (lets the bot see all group messages)</li>
+                  <li><code>/setbot2bot</code> → Enable (lets the bot see the other bot's messages)</li>
+                </ul>
+                Then remove and re-add each bot to the group — settings only apply to fresh memberships.
               </li>
               <li>
                 <span className="text-white font-semibold">4.</span> Send any message in the group. It'll appear below.
@@ -135,6 +167,70 @@ export default function AddRoomModal({ open, botUsername, onClose, onAdded }: Pr
                 </ul>
               )}
             </div>
+
+            <div className="mt-4 border-t border-cg-border pt-3">
+              <button
+                onClick={() => setManualOpen(o => !o)}
+                className="text-xs text-cg-muted hover:text-cg-accent transition-colors"
+              >
+                {manualOpen ? '▾ Hide manual entry' : '▸ Enter chat ID manually'}
+              </button>
+
+              {manualOpen && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-xs text-cg-muted">
+                    If detection isn't working, paste the group's chat_id directly. Get it from the server log
+                    (<code>[poll] incoming message: ... chatID=...</code>) or from @userinfobot in the group.
+                  </p>
+                  <div>
+                    <label className="block text-xs text-cg-muted mb-1">Chat ID</label>
+                    <input
+                      type="text"
+                      value={manualChatID}
+                      onChange={e => setManualChatID(e.target.value)}
+                      placeholder="-1001234567890"
+                      className="w-full px-3 py-2 bg-cg-bg border border-cg-border rounded-lg text-white
+                                 placeholder-cg-muted font-mono text-sm
+                                 focus:outline-none focus:border-cg-accent transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-cg-muted mb-1">Title (optional)</label>
+                    <input
+                      type="text"
+                      value={manualTitle}
+                      onChange={e => setManualTitle(e.target.value)}
+                      placeholder="Antiochus Room"
+                      className="w-full px-3 py-2 bg-cg-bg border border-cg-border rounded-lg text-white
+                                 placeholder-cg-muted text-sm
+                                 focus:outline-none focus:border-cg-accent transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-cg-muted mb-1">Local name</label>
+                    <input
+                      type="text"
+                      value={manualName}
+                      onChange={e => setManualName(e.target.value)}
+                      placeholder="project-alpha"
+                      className="w-full px-3 py-2 bg-cg-bg border border-cg-border rounded-lg text-white
+                                 placeholder-cg-muted font-mono text-sm
+                                 focus:outline-none focus:border-cg-accent transition-colors"
+                    />
+                  </div>
+                  <button
+                    onClick={handleManualSave}
+                    disabled={submitting || !manualName.trim() || !manualChatID.trim()}
+                    className="w-full py-2 text-sm bg-cg-accent text-cg-bg font-semibold rounded-lg
+                               hover:bg-cg-accent-dim disabled:opacity-50 transition-colors"
+                  >
+                    {submitting ? 'Saving…' : 'Save Room'}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {error && <p className="text-cg-danger text-xs mt-2">{error}</p>}
 
             <div className="flex justify-end mt-4">
               <button

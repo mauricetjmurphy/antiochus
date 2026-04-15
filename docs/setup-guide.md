@@ -20,16 +20,19 @@ Why each user needs their own bot: Telegram only allows one `getUpdates` consume
 2. Send `/newbot`, pick a name and a `_bot`-suffixed username
 3. Copy the **bot token** BotFather gives you
 
-## Step 2: Disable Privacy Mode (critical)
+## Step 2: Configure Your Bot in BotFather (critical)
 
+Two settings must be toggled before your bot will work as a relay. Message **@BotFather** and run both commands:
+
+**1. Disable privacy mode**
 By default a bot in a group only sees messages that @mention it. For Antiochus the bot must see every message.
+- Send `/setprivacy` → pick your bot → **Disable**
 
-1. Message **@BotFather**
-2. Send `/setprivacy`
-3. Pick your bot
-4. Choose **Disable**
+**2. Enable Bot-to-Bot mode**
+By default a bot cannot see messages from other bots in a group. Antiochus relies on the other participant's bot posting encrypted blobs, so your bot needs to be able to see them.
+- Send `/setbot2bot` → pick your bot → **Enable**
 
-Privacy mode changes only take effect after the bot is re-added to the group, so do this *before* adding the bot to any group, or remove and re-add the bot later.
+**Re-add the bot to any group after changing these settings.** Both options only take effect on fresh group memberships — if the bot is already in a group, remove it and add it back.
 
 ## Step 3: Configure the App
 
@@ -82,7 +85,8 @@ Click the paperclip icon next to the message input to send an encrypted file (up
 
 **Messages from other participants not appearing**
 - Make sure every participant uses the exact same passphrase. One character off = silent decryption failure.
-- Make sure privacy mode is disabled on every participant's bot, and that each bot was re-added to the group after disabling.
+- On every participant's bot, both `/setprivacy` (Disable) and `/setbot2bot` (Enable) must be set in @BotFather.
+- Each bot must be removed and re-added to the group after toggling those settings.
 - Check that both bots are still members of the group.
 
 **File too large**
