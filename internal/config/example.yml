@@ -1,0 +1,14 @@
+server:
+  addr: 127.0.0.1:8080
+telegram:
+  bot_token:
+  poll_timeout: 30
+  max_file_size_mb: 45
+  message_char_limit: 4000
+crypto:
+  argon2_time_cost: 4
+  argon2_memory_mb: 256
+  argon2_parallelism: 4
+storage:
+  max_messages_per_room: 500
+rooms: {}

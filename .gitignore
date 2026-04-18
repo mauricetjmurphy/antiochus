@@ -69,3 +69,6 @@ frontend/node_modules/
 
 # Built binaries
 dist/
+
+# config
+prod.yml
