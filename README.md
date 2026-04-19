@@ -40,6 +40,16 @@ You                       Telegram Group                  Friend
 
 ### Build
 
+Before the first build, create your local config by copying the example:
+
+```bash
+cp internal/config/example.yml internal/config/prod.yml
+```
+
+`prod.yml` is embedded into the binary at build time — edit it to set your bot token, rooms, and any other overrides. `example.yml` is checked in as the template; `prod.yml` is your copy (gitignored).
+
+Then build:
+
 ```bash
 make all
 ```
@@ -80,6 +90,45 @@ dist/antiochus-windows-arm64.exe
 
 No dependencies to install — it's a single file. They run it, open the browser, configure their own bot token, and join the shared room.
 
+## Desktop Launchers
+
+For a clickable-icon experience instead of running the binary from a terminal, drop your icons in [assets/](assets/):
+
+| File | Used by |
+|------|---------|
+| `antiochus.png` (256×256) | Linux `.desktop` + AppImage |
+| `antiochus.icns` | macOS `.app` bundle |
+| `antiochus.ico` (multi-res) | Windows embedded icon |
+
+Then build:
+
+```bash
+# Linux — install launcher system-wide (requires sudo) or per-user
+sudo make install-linux                       # /usr/local
+make install-linux PREFIX=$HOME/.local        # ~/.local
+
+# Linux — build AppImage AND register it in your app launcher (per-user, no sudo)
+make appimage                                 # builds + installs to ~/Applications/Antiochus/,
+                                              # adds .desktop to ~/.local/share/applications
+make uninstall-appimage                       # removes the install dir + launcher
+
+# Build-only variants (for shipping the .AppImage to others)
+make appimage-build                           # x86_64 — just the .AppImage, no install
+make appimage-arm64                           # aarch64
+
+# macOS — universal .app bundle
+make macos-app                                # dist/Antiochus.app
+make macos-app ARCH=arm64                     # single-arch variant
+
+# Windows — icon + version info embedded into the .exe
+make windows-resources                        # generates resource_windows_amd64.syso
+make build-windows-amd64                      # picks up the .syso automatically
+```
+
+Packaging sources live under [packaging/linux/](packaging/linux/), [packaging/macos/](packaging/macos/), and [packaging/windows/](packaging/windows/). Launchers invoke the binary with `--open` so the browser opens automatically on double-click.
+
+**Caveats.** Unsigned macOS `.app` bundles trip Gatekeeper — users right-click → Open the first time, or you codesign + notarize. Windows builds use `-H=windowsgui` to suppress the console on double-click, which also silences stdout when launched from `cmd.exe`. Only the amd64 Windows build gets an embedded icon out of the box.
+
 ## Configuration
 
 Config file: `internal/config/prod.yml` (next to the binary).
@@ -115,6 +164,7 @@ The bot token and rooms can also be configured from the web UI (Settings gear + 
 
 ```
 --addr    Override listen address (e.g. --addr 0.0.0.0:9090)
+--open    Open the UI in the default browser once the server is ready
 --version Show version
 ```
 
@@ -188,6 +238,11 @@ Runs crypto round-trip tests including cascade encrypt/decrypt, wrong passphrase
 antiochus/
 ├── main.go                     # Entrypoint, go:embed, CLI flags
 ├── Makefile                    # Build targets
+├── assets/                     # Icons for desktop launchers (png/icns/ico)
+├── packaging/
+│   ├── linux/                  # antiochus.desktop + AppImage build script
+│   ├── macos/                  # Info.plist.template + .app build script
+│   └── windows/                # goversioninfo spec (icon + version metadata)
 ├── docs/
 │   └── setup-guide.md          # User-facing setup guide (embedded in binary)
 ├── internal/

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Antiochus
+GenericName=Secure Messaging
+Comment=Antiochus secure local messaging server
+Exec=antiochus --open
+Icon=antiochus
+Terminal=false
+Categories=Network;Chat;Security;
+Keywords=chat;messaging;crypto;secure;
+StartupNotify=false

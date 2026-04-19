@@ -94,15 +94,12 @@ func configDir() string {
 	return filepath.Join(home, ".antiochus")
 }
 
+// configPath returns the runtime config path in the user's home directory so
+// that Antiochus works the same whether it's run from a dev tree, an installed
+// binary, or a read-only AppImage mount. The embedded prod.yml supplies the
+// defaults on first launch.
 func configPath() string {
-	exe, err := os.Executable()
-	if err != nil {
-		return "internal/config/prod.yml"
-	}
-	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
-		exe = resolved
-	}
-	return filepath.Join(filepath.Dir(exe), "internal", "config", "prod.yml")
+	return filepath.Join(configDir(), "prod.yml")
 }
 
 func (c *Config) Path() string {
